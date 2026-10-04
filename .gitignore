@@ -1,0 +1,14 @@
+# Generated payload and images
+june-arch/installer/liveiso/assets/
+*.iso
+
+# Blobs and secrets: never commit
+*.apk
+*.p12
+*.jks
+*.keystore
+*june-local.key
+*junelife_chain*.crt
+*.img
+*.bct
+*.bin

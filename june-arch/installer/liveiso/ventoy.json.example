@@ -1,0 +1,8 @@
+{
+  "control": [
+    { "VTOY_DEFAULT_IMAGE": "/june-local-live.iso" },
+    { "VTOY_DEFAULT_SEARCH_ROOT": "/" },
+    { "VTOY_MENU_TIMEOUT": "1" },
+    { "VTOY_SECONDARY_BOOT_MENU": "0" }
+  ]
+}

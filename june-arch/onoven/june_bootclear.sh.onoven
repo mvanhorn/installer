@@ -1,0 +1,19 @@
+#!/system/bin/sh
+# June ADB-enable boot hook.
+#
+# Bypasses the `garrus adb` gate on `user` builds by forcing adb_enabled=1.
+# NOTE: the on-oven local server (june-local) is NO LONGER launched from here;
+# it is started by the dedicated `junelocal` init service in the boot ramdisk
+# (see boot_junelocal_init.img / docs/ramdisk-init-service.md).
+
+LOG_TAG="junebootclear"
+LOG_NAME="${0}:"
+
+loge () { /system/bin/log -t $LOG_TAG -p e "$LOG_NAME $@"; }
+logi () { /system/bin/log -t $LOG_TAG -p i "$LOG_NAME $@"; }
+
+garrus clear
+sync
+
+settings put global adb_enabled 1
+logi "adb_enabled forced to 1"

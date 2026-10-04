@@ -1,0 +1,196 @@
+#!/system/bin/sh
+
+# Copyright 2017 June Life, Inc.
+#
+# All rights reserved
+#
+
+# On a reboot we need to remove update.zip file from the cache directory.
+# That file existing could cause ota to fail.
+#
+# June Local note: this is the stock june_reaper.sh with one addition. The
+# collector EncFS volume is mounted read-write (instead of read-only) when a
+# staged JuneCloudMessaging patch is present, the patch is applied during that
+# very first mount (the same mount the stock script performs), and the mounted
+# view is left read-write. Doing it here means the patch is in place before
+# Android starts, instead of relying on a second EncFS mount of the same
+# volume later in boot, which cannot work while /system (holding the
+# ciphertext) is read-only.
+
+LOG_TAG="junebucket"
+LOG_NAME="${0}:"
+
+
+loge ()
+{
+  /system/bin/log -t $LOG_TAG -p e "$LOG_NAME $@"
+}
+
+logi ()
+{
+  /system/bin/log -t $LOG_TAG -p i "$LOG_NAME $@"
+}
+
+REAPERPASSFLAG="/cache/reaperpass.flag"
+
+# We are done
+if [ -f $REAPERPASSFLAG ]; then
+   rm -rf $REAPERPASSFLAG
+fi
+
+DATA_PART="/dev/block/platform/sdhci-tegra.3/by-name/UDA"
+busybox df -h $DATA_PART
+MNTDATA=$?
+
+if [ "a$MNTDATA" != "a0" ]; then
+  logi "Data partition isn't mounted, aborting further data work"
+  setprop ro.june_encfs 1
+  exit 1
+fi
+
+if [ "$(ls -a /system/priv-app)" ]; then
+    mount -o rw,remount /system
+    rm -rf /system/priv-app/*
+    mount -o  r,remount /system
+fi
+
+if [ "$(ls -a /data/data)" ]; then
+    rm -rf /data/data/*
+fi
+
+insmod /system/lib/modules/june_reaper.ko
+while [ ! -f /proc/reaper ]; do sleep 2; done
+
+RMOUNT=1
+while [ "a$RMOUNT" == "a1" ]; do
+   RPASS=`cat /proc/reaper`
+   # Try to mount a few times, crypto chip is causing strange delays.
+   echo $RPASS | /system/bin/encfs --paranoia --stdinpass --public -o sync /data/reaper /data/data
+   RMOUNT=$?
+done
+
+logi "/data/data mount result ->" $RMOUNT
+
+# Lets wait to assure we mount
+/system/bin/busybox mountpoint -q /data/data
+CAP=$?
+
+while [ "a$CAP" != "a0" ]; do
+    sleep 2
+    /system/bin/busybox mountpoint -q /data/data
+    CAP=$?
+    logi "reaper mounted result ->" $CAP
+done
+
+while [ ! -f /proc/collector ]; do sleep 2; done
+
+# --- June Local: pick the staged JCM patch, if any -------------------------
+JCM_STAGE=""
+if [ -f /system/etc/june/jcm_nopin.apk ]; then
+   JCM_STAGE=/system/etc/june/jcm_nopin.apk
+elif [ -f /data/june/jcm_nopin.apk ]; then
+   JCM_STAGE=/data/june/jcm_nopin.apk
+fi
+
+# --- June Local: pick the staged Remotes (pairing UI) patch, if any --------
+REMOTES_STAGE=""
+if [ -f /system/etc/june/remotes_nopin.apk ]; then
+   REMOTES_STAGE=/system/etc/june/remotes_nopin.apk
+elif [ -f /data/june/remotes_nopin.apk ]; then
+   REMOTES_STAGE=/data/june/remotes_nopin.apk
+fi
+
+ANY_STAGE=""
+if [ -n "$JCM_STAGE" ]; then
+   ANY_STAGE=1
+fi
+if [ -n "$REMOTES_STAGE" ]; then
+   ANY_STAGE=1
+fi
+
+CMOUNT=1
+CTRIES=0
+while [ "a$CMOUNT" == "a1" ] && [ "$CTRIES" -lt 10 ]; do
+   CPASS=`cat /proc/collector`
+
+   if [ -n "$ANY_STAGE" ]; then
+      # EncFS writes its ciphertext into /system/collector, so /system has to
+      # be writable while the volume is mounted read-write (encfs is
+      # read-write by default; the stock script only passes -o ro).
+      mount -o rw,remount /system
+      echo $CPASS | /system/bin/encfs --paranoia --stdinpass --public /system/collector /system/priv-app
+   else
+      echo $CPASS | /system/bin/encfs --paranoia --stdinpass --public -o ro /system/collector /system/priv-app
+   fi
+   CMOUNT=$?
+   logi "/system/priv-app result ->" $CMOUNT
+   CTRIES=$((CTRIES + 1))
+done
+
+# Never hang the boot on a failing read-write mount: fall back to the stock
+# read-only mount, leaving the staged patch for another boot.
+if [ "a$CMOUNT" == "a1" ] && [ -n "$ANY_STAGE" ]; then
+   logi "june-local: read-write mount failed; falling back to stock read-only mount"
+   while [ "a$CMOUNT" == "a1" ]; do
+      CPASS=`cat /proc/collector`
+      echo $CPASS | /system/bin/encfs --paranoia --stdinpass --public -o ro /system/collector /system/priv-app
+      CMOUNT=$?
+      logi "/system/priv-app result ->" $CMOUNT
+   done
+fi
+
+# Lets wait to assure we mount
+/system/bin/busybox mountpoint -q /system/priv-app
+CAP=$?
+
+while [ "a$CAP" != "a0" ]; do
+    sleep 2
+    /system/bin/busybox mountpoint -q /system/priv-app
+    CAP=$?
+    logi "collector mounted result ->" $CAP
+done
+
+# --- June Local: apply staged app patches ----------------------------------
+# Back up the live APK, copy the staged one over the decrypted EncFS view,
+# verify, and record the result in a world-readable log.
+apply_staged_apk() {
+   stage="$1"
+   live="$2"
+   label="$3"
+   log="/data/june/logs/${label}_patch.log"
+   /system/bin/busybox mkdir -p /data/june/logs
+   if [ ! -f "$live" ]; then
+      logi "june-local: $live not found; leaving collector read-write"
+      echo "failed: live apk not found" > "$log"
+   elif /system/bin/busybox cmp -s "$stage" "$live"; then
+      logi "june-local: $label patch already applied"
+      echo "already-applied" > "$log"
+   else
+      cp -f "$live" "/data/june/${label}_stock_backup.apk" 2>/dev/null
+      if cp -f "$stage" "$live" && /system/bin/busybox cmp -s "$stage" "$live"; then
+         sync
+         logi "june-local: $label patch applied"
+         echo "applied: $(/system/bin/busybox sha256sum "$live" | /system/bin/busybox awk '{print $1}')" > "$log"
+         # A /data staging copy is only needed once: drop it so later boots go
+         # back to the stock read-only mount. The /system copy stays in place
+         # and is re-applied after a factory reset.
+         case "$stage" in
+            /data/june/*) rm -f "$stage" ;;
+         esac
+      else
+         logi "june-local: $label patch FAILED; restoring stock apk"
+         echo "failed: copy/verify failed" > "$log"
+         cp -f "/data/june/${label}_stock_backup.apk" "$live" 2>/dev/null
+      fi
+   fi
+   /system/bin/busybox chmod 0644 "$log" 2>/dev/null
+}
+
+if [ -n "$JCM_STAGE" ]; then
+   apply_staged_apk "$JCM_STAGE" /system/priv-app/JuneCloudMessaging/JuneCloudMessaging.apk jcm
+fi
+if [ -n "$REMOTES_STAGE" ]; then
+   apply_staged_apk "$REMOTES_STAGE" /system/priv-app/Remotes/Remotes.apk remotes
+fi
+
+setprop ro.june_encfs 1
