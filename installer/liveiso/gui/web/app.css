@@ -22,7 +22,7 @@
   --btn: #f4f4f5; --btnfg: #0a0a0b; --focus: #7cc4f2; --hw: 300;
   --tA: #1d1210; --tB: #2e1511; --tRim: rgba(255,122,64,.36); --tGlow: rgba(255,86,24,.34); --tSheen: rgba(255,255,255,.07);
   --uA: #191a1d; --uB: #24262a; --uRim: rgba(255,255,255,.16); --uGlyph: #c9ccd1;
-  --panel: rgba(255,255,255,.035); --dlg: #101216; --log: #050607;
+  --panel: rgba(255,255,255,.035); --dlg: #101216; --log: #050607; --brand: #f89a4e;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
@@ -34,7 +34,7 @@
     --btn: #18181b; --btnfg: #ffffff; --focus: #1f6fb2; --hw: 400;
     --tA: #fbf7f4; --tB: #f5e9e2; --tRim: rgba(217,72,15,.26); --tGlow: rgba(240,122,42,.16); --tSheen: rgba(255,255,255,.7);
     --uA: #f6f6f7; --uB: #ececee; --uRim: rgba(0,0,0,.12); --uGlyph: #5e6567;
-    --panel: rgba(0,0,0,.025); --dlg: #ffffff; --log: #f4f4f2;
+    --panel: rgba(0,0,0,.025); --dlg: #ffffff; --log: #f4f4f2; --brand: #b23c0d;
     color-scheme: light;
   }
 }
@@ -62,9 +62,8 @@ svg { display: block; }
   padding: max(14px, env(safe-area-inset-top)) 24px 14px; border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.brand-mark { width: 36px; height: 36px; flex: none; fill: none; stroke: var(--glyph); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px var(--gglow)) drop-shadow(0 0 6px var(--gglow)); }
-.brand-mark path { stroke: var(--ember); }
-.brand-mark circle { fill: var(--glyph); stroke: none; }
+/* The Project July mark, in the website's ember. */
+.brand-mark { width: 40px; height: 40px; flex: none; color: var(--brand); filter: drop-shadow(0 0 6px var(--glow)); }
 .brand-name { font: 500 22px/1.1 var(--f); }
 .brand-sub { font: 500 12px/16px var(--f); letter-spacing: .06em; text-transform: uppercase; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-right { display: flex; align-items: center; gap: 12px; flex: none; }
@@ -80,9 +79,9 @@ svg { display: block; }
   border-radius: 12px; box-shadow: inset 0 0 0 1px var(--uRim); background: linear-gradient(180deg, var(--uA), var(--uB));
   font: 600 15px/1 var(--f);
 }
-.icon-btn svg { width: 24px; height: 24px; fill: none; stroke: var(--uGlyph); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn svg { width: 24px; height: 24px; color: var(--uGlyph); }
 .icon-btn.on { box-shadow: inset 0 0 0 1px var(--tRim); background: radial-gradient(120% 75% at 50% 100%, var(--tGlow), transparent 62%), linear-gradient(180deg, var(--tA), var(--tB)); }
-.icon-btn.on svg { stroke: var(--glyph); filter: drop-shadow(0 0 4px var(--gglow)); }
+.icon-btn.on svg { color: var(--glyph); filter: drop-shadow(0 0 4px var(--gglow)); }
 .badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--ember); color: #160a04; font: 700 12px/22px var(--f); text-align: center; }
 
 /* ---- Status marks (word + shape + colour, never colour alone) -------- */
@@ -123,13 +122,13 @@ p { margin: 0 0 12px; line-height: 1.45; font-size: 17px; }
 }
 .tile:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--ember), inset 0 1px 0 var(--tSheen), 0 8px 28px -12px var(--glow); }
 .tile:active { transform: none; }
-.tile .glyph { position: absolute; top: 18px; left: 18px; width: 56px; height: 56px; fill: none; stroke: var(--glyph); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px var(--gglow)) drop-shadow(0 0 7px var(--gglow)); }
+.tile .glyph { position: absolute; top: 18px; left: 18px; width: 56px; height: 56px; color: var(--glyph); filter: drop-shadow(0 0 2px var(--gglow)) drop-shadow(0 0 7px var(--gglow)); }
 .tile-name { font: 500 21px/1.15 var(--f); }
 .tile-sub { font: 400 15px/1.3 var(--f); color: var(--fg2); }
 .tile .tag { position: absolute; top: 16px; right: 16px; padding: 4px 8px; border-radius: 6px; font: 700 11px/1 var(--f); letter-spacing: .08em; text-transform: uppercase; background: rgba(255,122,46,.16); color: var(--ember2); box-shadow: inset 0 0 0 1px var(--tRim); }
 .tile.grey { background: linear-gradient(180deg, var(--uA), var(--uB)); box-shadow: inset 0 0 0 1px var(--uRim); }
 .tile.grey:hover { box-shadow: inset 0 0 0 1px var(--fg2); }
-.tile.grey .glyph { stroke: var(--uGlyph); filter: none; }
+.tile.grey .glyph { color: var(--uGlyph); filter: none; }
 .tiles.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 .home-foot { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }

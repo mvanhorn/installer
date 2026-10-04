@@ -18,13 +18,15 @@ const MARK = {
 const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 const CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+// Tile icons: the Project July website's icon set (sprite in index.html).
+const icon = (id, cls = "") => `<svg${cls ? ` class="${cls}"` : ""} viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const GLYPH = {
-  install: '<svg class="glyph" viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="15" width="34" height="26" rx="4"/><rect x="12" y="24" width="24" height="12" rx="2"/><path d="M12.5 19.5h.01M17.5 19.5h.01"/><path d="M24 3v10M19.5 8.5 24 13l4.5-4.5"/></svg>',
-  custom: '<svg class="glyph" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5l15 5v11c0 10-6.5 17.5-15 21-8.5-3.5-15-11-15-21V10z"/><circle cx="24" cy="20" r="4.5"/><path d="M24 24.5V34M24 30h3.5"/></svg>',
-  backup: '<svg class="glyph" viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="27" width="34" height="14" rx="4"/><path d="M33 34h.01"/><path d="M24 4v17M18 15l6 6 6-6"/></svg>',
-  restore: '<svg class="glyph" viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="27" width="34" height="14" rx="4"/><path d="M33 34h.01"/><path d="M24 21V4M18 10l6-6 6 6"/></svg>',
-  more: '<svg class="glyph" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 16h32M8 32h32"/><circle cx="17" cy="16" r="4.5" style="fill:var(--uA)"/><circle cx="31" cy="32" r="4.5" style="fill:var(--uA)"/></svg>',
-  phone: '<svg class="glyph" viewBox="0 0 48 48" aria-hidden="true"><rect x="14" y="4" width="20" height="40" rx="4"/><path d="M21 38h6"/><path d="M24 12v15M19.5 22.5 24 27l4.5-4.5"/></svg>',
+  install: icon("oven", "glyph"),
+  custom: icon("key", "glyph"),
+  backup: icon("backup", "glyph"),
+  restore: icon("restore", "glyph"),
+  more: icon("sliders", "glyph"),
+  phone: icon("phone", "glyph"),
 };
 
 /* ---- Copy --------------------------------------------------------------- */
@@ -98,7 +100,7 @@ function toast(msg) {
 
 function renderHeader() {
   if (!S) return;
-  $("#brand-sub").textContent = S.local ? `Installer · build ${S.build}` : "On your phone";
+  $("#brand-sub").textContent = S.local ? `June Local installer · build ${S.build}` : "June Local installer · on your phone";
   const chip = $("#oven-chip");
   const job = S.job && S.job.status === "running";
   let html;
@@ -192,7 +194,7 @@ function viewHome() {
 }
 
 function phoneIcon() {
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>';
+  return icon("phone");
 }
 
 function wizard(stepIdx) {
