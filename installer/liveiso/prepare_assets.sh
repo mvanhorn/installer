@@ -197,6 +197,8 @@ wait_for_ums() {
   fi
   tg_rc=1
   tg_attempt=1
+  tg_stale=0
+  tg_out="$(mktemp /tmp/tegrarcm.XXXXXX.log)"
   while [ "$tg_attempt" -le 3 ]; do
     tg_rc=0
     unset LIBUSB_DEBUG
@@ -209,27 +211,41 @@ wait_for_ums() {
       timeout 90 "$TEGRARCM" --soc=124 --usb-timeout=45000 \
         --bct="$DIR/jetson-tk1.bct" \
         --bootloader="$DIR/u-boot-dtb-tegra.bin" \
-        --loadaddr=0x80108000 || tg_rc=$?
+        --loadaddr=0x80108000 >"$tg_out" 2>&1 || tg_rc=$?
     else
       "$TEGRARCM" --soc=124 --usb-timeout=45000 \
         --bct="$DIR/jetson-tk1.bct" \
         --bootloader="$DIR/u-boot-dtb-tegra.bin" \
-        --loadaddr=0x80108000 || tg_rc=$?
+        --loadaddr=0x80108000 >"$tg_out" 2>&1 || tg_rc=$?
     fi
+    cat "$tg_out"
     if [ "$tg_rc" -eq 0 ]; then
       break
     fi
     echo "[!] tegrarcm attempt $tg_attempt failed (exit $tg_rc)." >&2
+    # The boot ROM only answers one RCM session per power-on (it sends the
+    # chip UID once).  Once it stops answering, retrying without a power
+    # cycle just burns another USB timeout, so stop and ask for re-entry.
+    if grep -q 'Resource temporarily unavailable' "$tg_out"; then
+      tg_stale=1
+      break
+    fi
     tg_attempt=$((tg_attempt + 1))
     if [ "$tg_attempt" -le 3 ]; then
       sleep 3
     fi
   done
   unset LIBUSB_DEBUG
+  rm -f "$tg_out"
   if [ "$tg_rc" -ne 0 ]; then
-    echo "[-] tegrarcm failed after 3 attempts (last exit $tg_rc)." >&2
-    echo "[-] USB bus errors usually mean the cable or port: try another cable and a direct USB port (no hub), unplug/replug the oven, then retry." >&2
-    echo "[-] Also make sure the oven is in RCM mode (hold SW2, power on, keep holding ~10s)." >&2
+    if [ "$tg_stale" -eq 1 ]; then
+      echo "[-] The oven stopped answering in RCM mode (tegrarcm: Resource temporarily unavailable)." >&2
+      echo "[-] Unplug the oven power, wait 5 seconds, then hold SW2 and power it on again (keep holding ~10s), and retry." >&2
+    else
+      echo "[-] tegrarcm failed after 3 attempts (last exit $tg_rc)." >&2
+      echo "[-] USB bus errors usually mean the cable or port: try another cable and a direct USB port (no hub), unplug/replug the oven, then retry." >&2
+      echo "[-] Also make sure the oven is in RCM mode (hold SW2, power on, keep holding ~10s)." >&2
+    fi
     return 1
   fi
   sleep 2
@@ -809,6 +825,8 @@ wait_for_ums() {
   fi
   tg_rc=1
   tg_attempt=1
+  tg_stale=0
+  tg_out="$(mktemp /tmp/tegrarcm.XXXXXX.log)"
   while [ "$tg_attempt" -le 3 ]; do
     tg_rc=0
     unset LIBUSB_DEBUG
@@ -821,27 +839,41 @@ wait_for_ums() {
       timeout 90 "$TEGRARCM" --soc=124 --usb-timeout=45000 \
         --bct="$DIR/jetson-tk1.bct" \
         --bootloader="$DIR/u-boot-dtb-tegra.bin" \
-        --loadaddr=0x80108000 || tg_rc=$?
+        --loadaddr=0x80108000 >"$tg_out" 2>&1 || tg_rc=$?
     else
       "$TEGRARCM" --soc=124 --usb-timeout=45000 \
         --bct="$DIR/jetson-tk1.bct" \
         --bootloader="$DIR/u-boot-dtb-tegra.bin" \
-        --loadaddr=0x80108000 || tg_rc=$?
+        --loadaddr=0x80108000 >"$tg_out" 2>&1 || tg_rc=$?
     fi
+    cat "$tg_out"
     if [ "$tg_rc" -eq 0 ]; then
       break
     fi
     echo "[!] tegrarcm attempt $tg_attempt failed (exit $tg_rc)." >&2
+    # The boot ROM only answers one RCM session per power-on (it sends the
+    # chip UID once).  Once it stops answering, retrying without a power
+    # cycle just burns another USB timeout, so stop and ask for re-entry.
+    if grep -q 'Resource temporarily unavailable' "$tg_out"; then
+      tg_stale=1
+      break
+    fi
     tg_attempt=$((tg_attempt + 1))
     if [ "$tg_attempt" -le 3 ]; then
       sleep 3
     fi
   done
   unset LIBUSB_DEBUG
+  rm -f "$tg_out"
   if [ "$tg_rc" -ne 0 ]; then
-    echo "[-] tegrarcm failed after 3 attempts (last exit $tg_rc)." >&2
-    echo "[-] USB bus errors usually mean the cable or port: try another cable and a direct USB port (no hub), unplug/replug the oven, then retry." >&2
-    echo "[-] Also make sure the oven is in RCM mode (hold SW2, power on, keep holding ~10s)." >&2
+    if [ "$tg_stale" -eq 1 ]; then
+      echo "[-] The oven stopped answering in RCM mode (tegrarcm: Resource temporarily unavailable)." >&2
+      echo "[-] Unplug the oven power, wait 5 seconds, then hold SW2 and power it on again (keep holding ~10s), and retry." >&2
+    else
+      echo "[-] tegrarcm failed after 3 attempts (last exit $tg_rc)." >&2
+      echo "[-] USB bus errors usually mean the cable or port: try another cable and a direct USB port (no hub), unplug/replug the oven, then retry." >&2
+      echo "[-] Also make sure the oven is in RCM mode (hold SW2, power on, keep holding ~10s)." >&2
+    fi
     return 1
   fi
   sleep 2

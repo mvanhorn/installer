@@ -57,6 +57,10 @@ on_interrupt() {
 }
 trap on_interrupt INT TERM HUP
 
+# Keep kernel messages (e.g. Bluetooth -110 timeouts) off the menu.  loglevel=0
+# on the cmdline does not always survive to here, so pin it again.
+sudo -n dmesg -n 1 2>/dev/null || true
+
 banner() {
   echo "=============================================="
   echo " June Local installer"
@@ -132,13 +136,40 @@ log_stage_line() {
   printf '%s' "$line"
 }
 
+# Newest dd progress record in the log as "<bytes> <MB/s>".  dd pads shorter
+# records with trailing spaces and switches between kB/s, MB/s and GB/s, so
+# match loosely and normalise the rate (0 when unknown).
+log_dd_record() {
+  tr '\r' '\n' < "$1" 2>/dev/null \
+    | grep -E '^[0-9]+ bytes .*copied, ' | tail -n 1 \
+    | awk '{
+        r = 0; u = ""
+        for (i = NF; i > 1; i--) if ($i ~ /\/s$/) { r = $(i-1); u = $i; break }
+        if (u == "kB/s") r /= 1000
+        else if (u == "GB/s") r *= 1000
+        else if (u == "B/s" || u == "bytes/s") r /= 1000000
+        else if (u != "MB/s") r = 0
+        printf "%s %.1f\n", $1, r
+      }'
+}
+
+# Percentage of the oven image copied so far (0 when no dd record yet).
+log_progress_pct() {
+  local rec bytes
+  rec="$(log_dd_record "$1")"
+  bytes="${rec%% *}"
+  case "$bytes" in ''|*[!0-9]*) echo 0; return ;; esac
+  [ "$bytes" -le "$IMAGE_BYTES" ] || bytes="$IMAGE_BYTES"
+  echo $(( bytes * 100 / IMAGE_BYTES ))
+}
+
 # One clean progress line built from the newest dd progress record in the log.
 log_progress_line() {
   local log="$1" rec bytes rate pct copied remain eta_s eta
-  rec="$(tr '\r' '\n' < "$log" 2>/dev/null | grep -E '^[0-9]+ bytes \(.*copied, [0-9.]+ s, [0-9.]+ MB/s$' | tail -n 1 || true)"
+  rec="$(log_dd_record "$log")"
   [ -n "$rec" ] || return 1
-  bytes="$(printf '%s\n' "$rec" | awk '{print $1}')"
-  rate="$(printf '%s\n' "$rec" | awk '{for (i=1;i<=NF;i++) if ($i=="MB/s") print $(i-1)}')"
+  bytes="${rec%% *}"
+  rate="${rec#* }"
   case "$bytes" in ''|*[!0-9]*) return 1 ;; esac
   [ "$bytes" -le "$IMAGE_BYTES" ] || bytes="$IMAGE_BYTES"
   pct=$(( bytes * 100 / IMAGE_BYTES ))
@@ -234,21 +265,24 @@ to about 2 minutes, then the installer reports success or failure." \
 
 run_backup() {
   local mode="$1"; shift
-  local pid rc
+  local pid rc msg
   INSTALL_LOG="$(mktemp /tmp/june-backup.XXXXXX.log)"
   if command -v whiptail >/dev/null 2>&1; then
     (sudo -n bash "$BACKUP" "$mode" "$@" >"$INSTALL_LOG" 2>&1) &
     pid=$!
+    # whiptail --gauge protocol: "XXX", percent, prompt, "XXX".  whiptail only
+    # reads one prompt line, so send line breaks as a literal \n it expands.
+    # The text area keeps the height of the initial prompt, hence the padding.
     while kill -0 "$pid" 2>/dev/null; do
-      whiptail --title "Backup in progress" \
-        --infobox "$(progress_text "$INSTALL_LOG")
+      msg="$(progress_text "$INSTALL_LOG")
 
-The oven image is 7.3 GiB (~7.8 GB) and is written to the USB drive as one file.
-Typical write time: ~26 min at 5 MB/s, ~13 min at 10 MB/s, ~9 min at 15 MB/s.
-Do not unplug the oven or the USB drive." \
-        16 78
+The oven image is 7.3 GiB (~7.8 GB) and is written as one file.
+Typical: ~26 min at 5 MB/s, ~13 min at 10 MB/s, ~9 min at 15 MB/s.
+Do not unplug the oven or the USB drive."
+      printf 'XXX\n%s\n%s\nXXX\n' "$(log_progress_pct "$INSTALL_LOG")" "${msg//$'\n'/\\n}"
       sleep 1
-    done
+    done | whiptail --title "Backup in progress" \
+      --gauge "Starting...\n\n\n\n\n\n\n" 14 78 0
     wait "$pid"; rc=$?
     clear
   else
@@ -335,8 +369,8 @@ It signs a unique oven certificate for your LAN IP and hostname, installs that C
 
 Oven LAN IP and hostname:"
   result="$(dialog --stdout --no-cancel --visit-items --form "$form_text" 0 0 3 \
-    "Oven LAN IP:" 1 1 "" 1 22 40 0 \
-    "Hostname:" 2 1 "oven.local" 2 22 40 0)" || return 1
+    "Oven LAN IP (e.g. 192.168.1.50):" 1 1 "" 1 35 36 0 \
+    "Hostname:" 2 1 "oven.local" 2 35 36 0)" || return 1
   clear
   ip="$(printf '%s\n' "$result" | sed -n '1p')"
   host="$(printf '%s\n' "$result" | sed -n '2p')"
@@ -424,10 +458,14 @@ show_success() {
 }
 
 show_failure() {
-  local action="${1:-Install}" choice
+  local action="${1:-Install}" choice reason=""
+  # Surface the worker's own "[-] ..." explanation instead of only the log path.
+  if [ -n "${INSTALL_LOG:-}" ]; then
+    reason="$(tr '\r' '\n' < "$INSTALL_LOG" 2>/dev/null | grep -E '^\[-\] ' | tail -n 3 | cut -c5-200 || true)"
+  fi
   choice="$(whiptail --title "June Local installer" \
-    --menu "${action} did not finish.\n\n${PERSIST_MSG}\n\nWhat would you like to do next?" \
-    16 78 3 \
+    --menu "${action} did not finish.\n\n${reason:+$reason\n\n}${PERSIST_MSG}\n\nWhat would you like to do next?" \
+    24 78 3 \
     "log" "Show the full log" \
     "back" "Back to the menu" 3>&1 1>&2 2>&3)" || return 0
   if [ "$choice" = "log" ]; then
