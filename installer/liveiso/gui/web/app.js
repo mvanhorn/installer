@@ -21,7 +21,8 @@ const CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M1
 // Tile icons: the Project July website's icon set (sprite in index.html).
 const icon = (id, cls = "") => `<svg${cls ? ` class="${cls}"` : ""} viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const GLYPH = {
-  install: icon("oven", "glyph"),
+  // The June oven itself: the Project July mark, not the generic range icon.
+  install: '<svg class="glyph glyph-mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#i-mark"/></svg>',
   custom: icon("key", "glyph"),
   backup: icon("backup", "glyph"),
   restore: icon("restore", "glyph"),
