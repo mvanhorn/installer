@@ -12,3 +12,4 @@ installer/liveiso/assets/
 *.img
 *.bct
 *.bin
+upstream-content/

@@ -7,6 +7,13 @@ cd "$SCRIPT_DIR"
 # payload build usable from a published/source-only tree. See PUBLISHING.md.
 LR="${JUNE_LR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 ROOT="${JUNE_ROOT:-$(dirname "$LR")}"
+# This repo is flat (liveiso/, onoven/, ...); the development tree nests the
+# same directories under june-arch/. Support both with JUNE_LR.
+if [ -d "$LR/june-arch/onoven" ]; then
+  ARCH="$LR/june-arch"
+else
+  ARCH="$LR"
+fi
 DEST="assets"
 rm -rf "$DEST"
 mkdir -p "$DEST"
@@ -15,21 +22,40 @@ mkdir -p "$DEST"
 # the live system can be matched to the exact ISO that produced it.
 date -u +%Y%m%dT%H%M%SZ > "$DEST/BUILD_ID"
 
-cp "$LR/onoven/deploy_onoven.sh" "$DEST/"
-cp "$LR/onoven/june_bootclear.sh.onoven" "$DEST/"
-cp "$LR/onoven/june_reaper.sh.junelocal" "$DEST/"
-cp "$LR/companions_state.json" "$DEST/"
-cp "$LR/golocal/bin/june-local-linux-armv7" "$DEST/"
-cp "$LR/golocal/bin/june-camerad-linux-armv7" "$DEST/"
+cp "$ARCH/onoven/deploy_onoven.sh" "$DEST/"
+cp "$ARCH/onoven/june_bootclear.sh.onoven" "$DEST/"
+cp "$ARCH/onoven/june_reaper.sh.junelocal" "$DEST/"
+cp "$ARCH/companions_state.json" "$DEST/"
+cp "$ARCH/golocal/bin/june-local-linux-armv7" "$DEST/"
+cp "$ARCH/golocal/bin/june-camerad-linux-armv7" "$DEST/"
 cp "$ROOT/tools/certs/junelife_chain_godaddy_intermediate.crt" "$DEST/"
 cp "$ROOT/tools/certs/june-local.key" "$DEST/"
 cp "$LR/june-rcm/healthy-build/decrypted-priv-app/JuneCloudMessaging.apk" "$DEST/"
-cp "$LR/windows-work/jcm-pinning/JuneCloudMessaging_nopin_signed.apk" "$DEST/"
-cp "$LR/windows-work/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
-cp "$LR/windows-work/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
-cp "$LR/tools/orchestrator/boot_junelocal_init.img" "$DEST/"
-cp "$LR/packaging/generate_certs.sh" "$DEST/"
-cp "$LR/packaging/sign_leaf.sh" "$DEST/"
+cp "$ARCH/windows-work/jcm-pinning/JuneCloudMessaging_nopin_signed.apk" "$DEST/"
+cp "$ARCH/windows-work/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
+cp "$ARCH/windows-work/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
+# Presets/recipes content mirror (catalog + program bundles). June's content is
+# licensed material: it is used here for personal/local installs only and is
+# deliberately NOT published in the source repo (see PUBLISHING.md). Point
+# JUNE_CONTENT_DIR elsewhere, or remove it, to build without it.
+CONTENT_DIR="${JUNE_CONTENT_DIR:-}"
+if [ -z "$CONTENT_DIR" ]; then
+  for cand in "$ARCH/capture/upstream-content" "$LR/upstream-content"; do
+    if [ -d "$cand" ]; then
+      CONTENT_DIR="$cand"
+      break
+    fi
+  done
+fi
+if [ -d "$CONTENT_DIR" ]; then
+  cp -a "$CONTENT_DIR" "$DEST/upstream-content"
+  echo "[*] preset content included: $(du -sh "$DEST/upstream-content" | cut -f1)"
+else
+  echo "[!] preset content not found at $CONTENT_DIR; guided programs (proof, slow cook, recipes) will be unavailable" >&2
+fi
+cp "$ARCH/tools/orchestrator/boot_junelocal_init.img" "$DEST/"
+cp "$ARCH/packaging/generate_certs.sh" "$DEST/"
+cp "$ARCH/packaging/sign_leaf.sh" "$DEST/"
 cp "$LR/june-rcm/jetson-tk1.bct" "$DEST/"
 cp "$LR/june-rcm/u-boot/u-boot-dtb-tegra.bin" "$DEST/"
 
@@ -263,6 +289,7 @@ if [ "$MODE" = "generate" ]; then
   [ -n "$OVEN_IP" ] || read -rp "Oven LAN IP: " OVEN_IP
   [ -n "$OVEN_HOST" ] || read -rp "Hostname (optional): " OVEN_HOST
   OVEN_HOST="${OVEN_HOST:-oven.local}"
+  export OVEN_HOST
   if [ "$PERSIST" = "persist" ]; then
     JCM_PERSIST=1
   fi
@@ -306,7 +333,10 @@ else
   # factory reset. Never stage the factory APK under the patch name - it would
   # shadow a real patch on the next custom install and silently keep the oven
   # pinned to the June cloud.
-  if [ "${2:-}" = "persist" ]; then
+  OVEN_HOST="${2:-}"
+  PERSIST="${3:-}"
+  export OVEN_HOST
+  if [ "$PERSIST" = "persist" ]; then
     JCM_PERSIST=1
     export JCM_SRC="$DIR/JuneCloudMessaging_nopin_signed.apk"
   else

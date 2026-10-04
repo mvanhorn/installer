@@ -35,13 +35,22 @@ JUNE_LR=/path/to/local-resources JUNE_ROOT=/path/to/June ./prepare_assets.sh
 | `generate_certs.sh`, `sign_leaf.sh` | `packaging/` | yes |
 | `install.sh`, `backup.sh` | embedded in `prepare_assets.sh` | yes |
 | `june-local`, `june-camerad` armv7 binaries | `golocal/bin/` | prefer publishing `golocal/` source |
-| `companions_state.json` | repo root | yes |
+| `companions_state.json` | repo root (supplied blob) | yes |
 | `boot_junelocal_init.img` | `tools/orchestrator/` | no; publish `build_boot_junelocal_init.py` + `jcm_apply.sh` and build it |
 | `JuneCloudMessaging.apk` | `june-rcm/healthy-build/…` | **no** (June proprietary) |
 | `JuneCloudMessaging_nopin_signed.apk` | `windows-work/jcm-pinning/` | **no** (modified June app) |
 | `companion_endpoint_signed.apk` | `windows-work/companion-endpoint/` | **no** |
 | `junelife_chain_godaddy_intermediate.crt`, `june-local.key` | `June/tools/certs/` | **no** — contains June's private key |
 | `tegrarcm`, `jetson-tk1.bct`, `u-boot-dtb-tegra.bin` | `june-rcm/` | no (June/NVIDIA firmware) |
+| `upstream-content/` (presets/recipes mirror, ~287 MB) | `upstream-content/` (or `JUNE_CONTENT_DIR`) | **no** — June/third-party content, reference only |
+
+The preset/recipe mirror is what makes guided programs (Proof, Slow Cook,
+recipes) work: june-local serves `POST /1/presets/catalog` and
+`GET /1/presets/bundle/...` from it. `prepare_assets.sh` includes it when
+`JUNE_CONTENT_DIR` (default `upstream-content/`, falling back to the development
+tree's `june-arch/capture/upstream-content`) exists, so
+personal builds get working guided programs; published builds should omit it
+for licensing reasons and document that users must supply their own content.
 
 ## Suggested published layout
 

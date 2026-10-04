@@ -165,6 +165,16 @@ install_system_files() {
   # starts; without a staged patch it behaves exactly like the stock script.
   install -m 0755 "$JUNE_REAPER_SRC" "$mnt/bin/june_reaper.sh"
 
+  # Advertise the configured hostname over mDNS. june_reaper sets net.hostname
+  # from this file at boot and Android's NsdService then publishes
+  # <name>.local (the certificate already carries the matching SAN).
+  hostname_value="${OVEN_HOST:-june-oven}"
+  hostname_value="${hostname_value%.local}"
+  [ -n "$hostname_value" ] || hostname_value="june-oven"
+  printf '%s\n' "$hostname_value" > "$mnt/etc/june_hostname"
+  chmod 0644 "$mnt/etc/june_hostname"
+  echo "[*] oven hostname: $hostname_value (will advertise $hostname_value.local)"
+
   # The live Android build deletes raw /system/priv-app at boot and mounts the
   # encrypted /system/collector EncFS volume over it, so writing the APK there
   # never affects the running package. The patched june_reaper.sh performs the
@@ -354,6 +364,24 @@ if [ -n "$REMOTES_SRC" ]; then
   fi
 else
   rm -f "$UDA_MNT/june/remotes_nopin.apk"
+fi
+
+# Presets/recipes content mirror: june-local serves the catalog and program
+# bundles from /capture/upstream-content (june_reaper links /capture to /data),
+# which is what guided programs such as Proof and Slow Cook load.
+if [ -d "$SRC_DIR/upstream-content" ]; then
+  content_kb="$(du -sk "$SRC_DIR/upstream-content" | awk '{print $1}')"
+  avail_kb="$(df -Pk "$UDA_MNT" 2>/dev/null | awk 'NR==2{print $4}')"
+  if [ "${avail_kb:-0}" -gt $(( content_kb + 65536 )) ]; then
+    echo "[*] installing preset/recipe content ($(( content_kb / 1024 )) MB) to /data/june/upstream-content..."
+    rm -rf "$UDA_MNT/june/upstream-content"
+    cp -a "$SRC_DIR/upstream-content" "$UDA_MNT/june/upstream-content"
+    echo "[+] preset content installed ($(du -sh "$UDA_MNT/june/upstream-content" 2>/dev/null | cut -f1)); guided programs enabled"
+  else
+    echo "[!] not enough space on /data for preset content (need $(( content_kb / 1024 )) MB, have $(( ${avail_kb:-0} / 1024 )) MB); guided programs will be unavailable" >&2
+  fi
+else
+  echo "[i] no preset content in the payload; guided programs (proof, slow cook, recipes) will be unavailable"
 fi
 
 sync

@@ -51,6 +51,20 @@ The host needs Docker or Podman (build runs `live-build` inside the container).
   never writes the factory APK under the patch name. Factory-reset persistence
   is opt-in there too (default off): when enabled, the no-pin JCM patch is
   staged in `/system` so it survives a factory reset.
+- Both install flows ask for an oven name: the standard flow defaults to
+  `june`, the custom flow to `june.local` (its IP field is prefilled with
+  `192.168.1.`). The name is written to `/system/etc/june_hostname` and the
+  boot script sets `net.hostname` from it, so Android advertises
+  `<name>.local` over mDNS. Factory-reset persistence is a yes/no question and
+  defaults to No.
+- In the standard (prepackaged) install the name is mDNS-only: June's
+  prepackaged certificate does not cover it, so HTTPS-by-name needs the custom
+  (per-home CA) install, which puts the name in the certificate SAN.
+- Optional for other devices on the network: point `api.junelife.com` and
+  `messaging.junelife.com` at the oven's IP in local DNS (or a hosts file). The
+  prepackaged certificate is a real certificate for those names, so even stock
+  June clients verify there. The installer already writes the equivalent
+  entries into the oven's own `/etc/hosts`.
 - USB/oven connection guide: <https://project-july.org/setup>.
 - `/opt/june-installer` on the live system contains `install.sh` and the deploy
   assets.

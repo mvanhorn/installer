@@ -193,4 +193,27 @@ if [ -n "$REMOTES_STAGE" ]; then
    apply_staged_apk "$REMOTES_STAGE" /system/priv-app/Remotes/Remotes.apk remotes
 fi
 
+# --- June Local: mDNS hostname + content mirror ----------------------------
+# Android's NsdService advertises <net.hostname>.local; the installer writes
+# the chosen name (without the .local suffix) to /system/etc/june_hostname.
+if [ -f /system/etc/june_hostname ]; then
+   HN=`cat /system/etc/june_hostname 2>/dev/null`
+   case "$HN" in
+      *.local) HN=${HN%.local} ;;
+   esac
+   if [ -n "$HN" ]; then
+      setprop net.hostname "$HN"
+      logi "june-local: net.hostname set to $HN"
+   fi
+fi
+
+# june-local serves the presets catalog and bundles from
+# capture/upstream-content, relative to its working directory (/).
+if [ -d /data/june/upstream-content ]; then
+   /system/bin/busybox mkdir -p /capture
+   if [ ! -e /capture/upstream-content ]; then
+      /system/bin/busybox ln -s /data/june/upstream-content /capture/upstream-content
+   fi
+fi
+
 setprop ro.june_encfs 1

@@ -335,8 +335,8 @@ It signs a unique oven certificate for your LAN IP and hostname, installs that C
 
 Oven LAN IP and hostname:"
   result="$(dialog --stdout --no-cancel --visit-items --form "$form_text" 0 0 3 \
-    "Oven LAN IP:" 1 1 "" 1 22 40 0 \
-    "Hostname:" 2 1 "oven.local" 2 22 40 0)" || return 1
+    "Oven LAN IP:" 1 1 "192.168.1." 1 22 40 0 \
+    "Hostname:" 2 1 "june.local" 2 22 40 0)" || return 1
   clear
   ip="$(printf '%s\n' "$result" | sed -n '1p')"
   host="$(printf '%s\n' "$result" | sed -n '2p')"
@@ -344,17 +344,14 @@ Oven LAN IP and hostname:"
     whiptail --title "Per-home CA + leaf" --msgbox "Oven LAN IP cannot be empty." 8 78
     return 1
   }
-  host="${host:-oven.local}"
+  host="${host:-june.local}"
 
   persist_flag=""
-  persist_choice="$(whiptail --title "Factory-reset persistence" \
-    --checklist "Optional: where should the JuneCloudMessaging patch payload be staged?\n\nChecked: store it in /system so the one-shot applier survives a factory reset.\nUnchecked (default): store it in /data only; a factory reset removes it." \
-    14 78 1 \
-    "persist" "Opt in: persist patch payload in /system across factory resets" OFF \
-    3>&1 1>&2 2>&3)" || persist_choice=""
-  case "$persist_choice" in
-    *persist*) persist_flag="persist" ;;
-  esac
+  if whiptail --title "Factory-reset persistence" --defaultno \
+    --yesno "Persist the patch payload in /system so it survives a factory reset?\n\nNo (default, recommended): the JCM/Remotes patches are staged in /data only; a factory reset removes them.\nYes: they are staged in /system and re-applied after a factory reset." \
+    16 78 --yes-button "Persist" --no-button "Do not persist"; then
+    persist_flag="persist"
+  fi
 
   whiptail --title "Per-home CA + leaf" \
     --yesno "Connect the oven with the USB cable and put it in RCM mode:\n\n1. Hold SW2 (FORCE_RECOVERY).\n2. Power the oven on and keep holding SW2 for about 10 seconds.\n\nOnce patching starts the oven fans spin up faster and keep spinning while it works; this may take up to about 2 minutes.\n\nConnection guide: $GUIDE_URL\n\nPress Continue when ready, or Back to return to the menu." \
@@ -462,15 +459,16 @@ if command -v whiptail >/dev/null 2>&1; then
 
     case "$CHOICE" in
       install)
+        oven_name="$(whiptail --title "June Local installer" \
+          --inputbox "Name for this June oven, used for its mDNS address <name>.local:\n\nNote: this basic install keeps June's prepackaged certificate, which does not cover this name. Use the oven's IP (or turn TLS verification off) for HTTPS; the .local name is for convenience and plain HTTP. The custom install issues a certificate for the name.\n\nOptional for other devices: point api.junelife.com and messaging.junelife.com at the oven's IP in your DNS (or hosts file). The prepackaged certificate matches those names, so even stock June clients verify there." \
+          17 78 "june" --ok-button "Next" --cancel-button "Back" 3>&1 1>&2 2>&3)" || continue
+        oven_name="${oven_name:-june}"
         persist_flag=""
-        persist_choice="$(whiptail --title "Standard install options" \
-          --checklist "This installs June Local with the prepackaged June certificate and keeps the oven's factory messaging app.\n\nFactory-reset persistence is optional and off by default. Opt in to also stage the no-pin JCM patch in the oven's /system partition, where it survives a factory reset. Enable it only if you plan to switch this oven to a per-home CA later.\n\nPress Continue to review the RCM steps." \
-          18 78 1 \
-          "persist" "Opt in: also stage the no-pin JCM patch in /system (survives factory reset)" OFF \
-          3>&1 1>&2 2>&3)" || persist_choice=""
-        case "$persist_choice" in
-          *persist*) persist_flag="persist" ;;
-        esac
+        if whiptail --title "Factory-reset persistence" --defaultno \
+          --yesno "Persist the patch payload in /system so it survives a factory reset?\n\nNo (default, recommended): the standard install keeps the oven's factory apps; nothing is written to /system for them.\nYes: also stage the no-pin JCM patch in /system, so it survives a factory reset (needed only if you later switch this oven to a per-home CA)." \
+          16 78 --yes-button "Persist" --no-button "Do not persist"; then
+          persist_flag="persist"
+        fi
         whiptail --title "June Local installer" \
           --yesno "Put the oven in RCM mode:\n\n1. Connect the oven with the USB cable.\n2. Hold SW2 (FORCE_RECOVERY).\n3. Power the oven on and keep holding SW2 for about 10 seconds.\n\nOnce patching starts the oven fans spin up faster and keep spinning while it works; this may take up to about 2 minutes.\n\nConnection guide: $GUIDE_URL\n\nPress Continue when the oven is in RCM mode, or Back to return to the menu." \
           18 78 --yes-button "Continue" --no-button "Back" || continue
@@ -478,11 +476,7 @@ if command -v whiptail >/dev/null 2>&1; then
         install_ok=0
         PATCH_STAGED=0
         [ "$persist_flag" = "persist" ] && PATCH_STAGED=1
-        if [ -n "$persist_flag" ]; then
-          run_install prepackaged "$persist_flag" || install_ok=1
-        else
-          run_install prepackaged || install_ok=1
-        fi
+        run_install prepackaged "$oven_name" "$persist_flag" || install_ok=1
         if [ "$install_ok" -eq 0 ]; then
           persist_log
           show_success "Then install the companion app and set the oven endpoint using the steps printed below.${persist_flag:+ The no-pin JCM patch is staged in /system and persists across factory resets; the oven applies it on the next boot.}"
@@ -557,12 +551,19 @@ else
   read -rp "Choice [1]: " choice
   case "${choice:-1}" in
     1)
+      read -rp "Name for this June oven [june]: " oven_name
+      oven_name="${oven_name:-june}"
+      echo "Note: this basic install keeps June's prepackaged certificate, which does not"
+      echo "cover this name - use the oven's IP (or disable TLS verification) for HTTPS."
+      echo "The .local name works for mDNS and plain HTTP; the custom install covers it in the certificate."
+      echo "Optional: point api.junelife.com and messaging.junelife.com at the oven's IP in"
+      echo "your DNS or hosts file - the prepackaged certificate matches those names."
       echo "Connect the oven, hold SW2, and power it on."
       echo "Once patching starts the oven fans spin up faster and keep spinning while it works;"
       echo "this may take up to about 2 minutes."
       echo "Connection guide: $GUIDE_URL"
       read -rp "Press Enter when the oven is in RCM mode: "
-      if run_install prepackaged; then
+      if run_install prepackaged "$oven_name"; then
         echo "Success. Unplug the oven power and the USB cable."
         echo "TEST NOW: power it back on, then open http://<oven-ip>/local to confirm"
         echo "June Local, and pair from the June app / Home Assistant."
