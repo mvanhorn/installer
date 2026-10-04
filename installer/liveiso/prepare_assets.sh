@@ -1019,6 +1019,16 @@ if [ "$MODE" = "ventoy-dir" ]; then
   exit 1
 fi
 
+# images DEST [FOLDER]: list restorable images as "<path>\t<bytes>" so a UI
+# can let the user pick one (restore otherwise takes the first it finds).
+if [ "$MODE" = "images" ]; then
+  dest="$(resolve_explicit_destination "${2:-}")" || exit 1
+  root="${dest#*$'\t'}"
+  [ -n "${3:-}" ] && root="$root/$3"
+  find "$root" -maxdepth 1 -type f \( -name '*.img' -o -name '*.raw' \) -printf '%p\t%s\n' 2>/dev/null | sort
+  exit 0
+fi
+
 if [ -f "$DIR/BUILD_ID" ]; then
   echo "[*] Installer build: $(cat "$DIR/BUILD_ID")"
 fi
@@ -1092,6 +1102,14 @@ case "$MODE" in
       exit 1
     fi
     image="$(echo "$images" | head -n1)"
+    # An explicit image name (4th argument) picks that file instead.
+    if [ -n "$FILENAME_ARG" ] && [ -n "$DEST_ARG" ]; then
+      image="$root/$(basename "$FILENAME_ARG")"
+      if [ ! -f "$image" ]; then
+        echo "[-] Backup image not found: $image" >&2
+        exit 1
+      fi
+    fi
     sz="$(stat -c '%s' "$image" 2>/dev/null || echo 0)"
     if [ "$sz" != "$EXPECTED_SIZE" ]; then
       echo "[-] Backup size mismatch: $image is $sz bytes, expected $EXPECTED_SIZE." >&2

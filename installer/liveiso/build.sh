@@ -22,7 +22,17 @@ chmod +x \
   "config/includes.chroot$PAYLOAD/sign_leaf.sh" \
   "config/includes.chroot$PAYLOAD/tegrarcm"
 
-# Extra runtime packages for the live system (menu UI + deploy dependencies).
+# Graphical installer: Python backend + web UI (see gui/).  The dev/ mock
+# tooling stays out of the image.
+rsync -a --exclude dev/ /build/gui/ "config/includes.chroot$PAYLOAD/gui/"
+mkdir -p config/includes.chroot/etc/systemd/system config/includes.chroot/usr/local/bin
+mv "config/includes.chroot$PAYLOAD/gui/june-gui.service" config/includes.chroot/etc/systemd/system/
+mv "config/includes.chroot$PAYLOAD/gui/june-kiosk" config/includes.chroot/usr/local/bin/
+chmod +x config/includes.chroot/usr/local/bin/june-kiosk
+
+# Extra runtime packages for the live system (menu UI + deploy dependencies,
+# then the GUI: cage kiosk compositor, cog/WPE WebKit, Mesa for GPU and
+# software rendering, logind seat access, the backend and QR codes).
 mkdir -p config/package-lists
 cat > config/package-lists/june.list.chroot <<'EOF'
 whiptail
@@ -35,7 +45,42 @@ usbutils
 libcrypto++8
 libusb-1.0-0
 libstdc++6
+cage
+cog
+libgl1-mesa-dri
+libegl-mesa0
+dbus
+libpam-systemd
+python3
+qrencode
+iproute2
+fonts-dejavu-core
 EOF
+
+# Wired DHCP so a phone on the same network can reach the installer.
+mkdir -p config/includes.chroot/etc/systemd/network
+cat > config/includes.chroot/etc/systemd/network/20-june-wired.network <<'EOF'
+[Match]
+Name=en* eth*
+
+[Network]
+DHCP=yes
+EOF
+
+# Enable the GUI backend and networkd; mask ifupdown (if present) so a NIC
+# never gets two DHCP clients.
+mkdir -p config/hooks/normal
+cat > config/hooks/normal/9100-june-services.hook.chroot <<'EOF'
+#!/bin/sh
+set -e
+systemctl enable june-gui.service systemd-networkd.service
+for unit in networking.service ifup@.service; do
+  if [ -e "/lib/systemd/system/$unit" ]; then
+    systemctl mask "$unit"
+  fi
+done
+EOF
+chmod +x config/hooks/normal/9100-june-services.hook.chroot
 
 # Menu + helper available on the live system.
 mkdir -p config/includes.chroot/usr/local/bin
@@ -265,10 +310,14 @@ to about 2 minutes, then the installer reports success or failure." \
 
 run_backup() {
   local mode="$1"; shift
-  local pid rc msg
+  local pid rc msg feed
   INSTALL_LOG="$(mktemp /tmp/june-backup.XXXXXX.log)"
   if command -v whiptail >/dev/null 2>&1; then
-    (sudo -n bash "$BACKUP" "$mode" "$@" >"$INSTALL_LOG" 2>&1) &
+    # Background jobs get /dev/null as stdin; restore's confirmation prompt
+    # needs the answer the menu already collected.
+    feed=""
+    [ "$mode" = "restore" ] && feed="RESTORE"
+    (printf '%s\n' "$feed" | sudo -n bash "$BACKUP" "$mode" "$@" >"$INSTALL_LOG" 2>&1) &
     pid=$!
     # whiptail --gauge protocol: "XXX", percent, prompt, "XXX".  whiptail only
     # reads one prompt line, so send line breaks as a literal \n it expands.
@@ -549,8 +598,17 @@ if command -v whiptail >/dev/null 2>&1; then
       restore)
         choose_destination restore || continue
         whiptail --title "Restore oven from USB" \
-          --yesno "This writes a previously created backup image back to the June eMMC from:\n\n$BACKUP_DEST${BACKUP_FOLDER:+/$BACKUP_FOLDER}\n\nThis DESTROYS the current contents of the oven. Put the oven in RCM mode.\n\nType RESTORE when prompted by the restore script." \
-          18 78 --yes-button "Continue" --no-button "Back" || continue
+          --yesno "This writes a previously created backup image back to the June eMMC from:\n\n$BACKUP_DEST${BACKUP_FOLDER:+/$BACKUP_FOLDER}\n\nThis DESTROYS the current contents of the oven. Put the oven in RCM mode." \
+          16 78 --yes-button "Continue" --no-button "Back" || continue
+        # The worker runs in the background with no terminal, so collect its
+        # RESTORE confirmation here and hand it over on stdin (run_backup).
+        confirm="$(whiptail --title "Confirm restore" \
+          --inputbox "Type RESTORE to erase the oven and restore the backup:" \
+          10 78 "" --ok-button "Restore" --cancel-button "Back" 3>&1 1>&2 2>&3)" || continue
+        if [ "$confirm" != "RESTORE" ]; then
+          whiptail --title "Restore oven from USB" --msgbox "Restore cancelled: the confirmation did not match RESTORE." 8 78
+          continue
+        fi
         await_oven || continue
         if run_backup restore "$BACKUP_DEST" "$BACKUP_FOLDER"; then
           persist_log
@@ -686,13 +744,21 @@ user ALL=(ALL) NOPASSWD: ALL
 EOF
 chmod 0440 config/includes.chroot/etc/sudoers.d/june-live
 
-# Start the installer menu automatically after login, but only on a real
+# Start the installer automatically after login, but only on a real
 # interactive console so the user can still drop to a shell if needed.
+# tty1 gets the graphical installer unless the "text mode" boot entry passed
+# june.ui=text; june-kiosk itself falls back to the text menu.
 mkdir -p config/includes.chroot/etc/profile.d
 cat > config/includes.chroot/etc/profile.d/zz-june-menu.sh <<'EOF'
 if [ "${BASH_VERSION:-}" ] && [ "$(id -u)" -ne 0 ]; then
   case "$(tty 2>/dev/null)" in
-    /dev/tty1|/dev/ttyS0)
+    /dev/tty1)
+      case " $(cat /proc/cmdline 2>/dev/null) " in
+        *" june.ui=text "*) [ -x /usr/local/bin/june-menu ] && /usr/local/bin/june-menu ;;
+        *) [ -x /usr/local/bin/june-kiosk ] && /usr/local/bin/june-kiosk ;;
+      esac
+      ;;
+    /dev/ttyS0)
       if [ -x /usr/local/bin/june-menu ]; then
         /usr/local/bin/june-menu
       fi
@@ -712,12 +778,43 @@ lb config \
   --mirror-bootstrap http://deb.debian.org/debian \
   --mirror-chroot http://deb.debian.org/debian
 
-# Boot the single "Live system (amd64)" entry automatically after a few seconds
-# instead of waiting for a key press.  ISOLINUX uses tenths of a second, so
-# 50 = 5 seconds.
+# Two boot entries: the graphical installer (default) and the text installer.
+# Boot the default automatically after 5 seconds instead of waiting for a key
+# press.  ISOLINUX uses tenths of a second, so 50 = 5 seconds.  live-build
+# fills in the @...@ kernel/initrd/append placeholders (binary_grub_cfg for
+# GRUB/UEFI, live.cfg.in for ISOLINUX/BIOS).
 mkdir -p config/bootloaders/grub-pc config/bootloaders/isolinux
+cat > config/bootloaders/grub-pc/grub.cfg <<'EOF'
+source /boot/grub/config.cfg
+
+menuentry "June Local installer" --hotkey=g {
+	linux	@KERNEL_LIVE@ @APPEND_LIVE@ june.ui=gui
+	initrd	@INITRD_LIVE@
+}
+
+menuentry "June Local installer (text mode)" --hotkey=t {
+	linux	@KERNEL_LIVE@ @APPEND_LIVE@ june.ui=text
+	initrd	@INITRD_LIVE@
+}
+EOF
+
+cat > config/bootloaders/isolinux/live.cfg.in <<'EOF'
+label june-gui
+	menu label ^June Local installer
+	menu default
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@ june.ui=gui
+
+label june-text
+	menu label June Local installer (^text mode)
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@ june.ui=text
+EOF
+
 cat > config/bootloaders/grub-pc/config.cfg <<'EOF'
-set timeout=0
+set timeout=5
 set default=0
 
 if [ x$feature_default_font_path = xy ] ; then
@@ -754,7 +851,7 @@ cat > config/bootloaders/isolinux/isolinux.cfg <<'EOF'
 include menu.cfg
 default vesamenu.c32
 prompt 0
-timeout 1
+timeout 50
 EOF
 
 lb build
