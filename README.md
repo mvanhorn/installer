@@ -8,35 +8,34 @@ the oven's eMMC.
 
 This repository is the publishable subset of the development tree. Proprietary
 June blobs, firmware and private keys are **not** included; see
-`june-arch/installer/liveiso/PUBLISHING.md` for the full input list and what
+`installer/liveiso/PUBLISHING.md` for the full input list and what
 must be supplied locally.
 
 ## Layout
 
 ```
-june-arch/
-  installer/liveiso/   build the ISO (Docker + live-build) and the installer menu
-  onoven/              on-oven deploy scripts
-                       deploy_onoven.sh, june_bootclear.sh.onoven,
-                       june_reaper.sh.junelocal
-  packaging/           certificate generation (generate_certs.sh, sign_leaf.sh)
-  tools/orchestrator/  boot image builder (build_boot_junelocal_init.py) and the
-                       jcm_apply.sh fallback service
-  windows-work/        APK no-pin patch recipes (jcm-pinning, remotes-pinning)
+installer/liveiso/   build the ISO (Docker + live-build) and the installer menu
+onoven/              on-oven deploy scripts
+                     deploy_onoven.sh, june_bootclear.sh.onoven,
+                     june_reaper.sh.junelocal
+packaging/           certificate generation (generate_certs.sh, sign_leaf.sh)
+tools/orchestrator/  boot image builder (build_boot_junelocal_init.py) and the
+                     jcm_apply.sh fallback service
+windows-work/        APK no-pin patch recipes (jcm-pinning, remotes-pinning)
 ```
 
-The paths mirror the development tree so `prepare_assets.sh` works unchanged
-when pointed at this checkout with `JUNE_LR`.
+Point `prepare_assets.sh` at this checkout with `JUNE_LR` (it defaults to the
+repo root) plus the locally supplied blobs.
 
 ## Build
 
 `prepare_assets.sh` assembles the payload from this tree plus a few blobs that
 are not in git (June APKs, certificates/keys, firmware, prebuilt armv7
 binaries, the flashed boot image). See
-`june-arch/installer/liveiso/PUBLISHING.md` for the exact list.
+`installer/liveiso/PUBLISHING.md` for the exact list.
 
 ```sh
-cd june-arch/installer/liveiso
+cd installer/liveiso
 JUNE_LR=<this-repo> JUNE_ROOT=<tree-with-tools/certs> bash prepare_assets.sh
 bash build_live_iso.sh          # writes june-local-live.iso
 ```
@@ -52,5 +51,5 @@ machine from it, and follow the on-screen menu.
 - NVIDIA/June firmware blobs (`tegrarcm`, `jetson-tk1.bct`, `u-boot-dtb-tegra.bin`)
 - Prebuilt armv7 binaries (`june-local`, `june-camerad`) and the boot image
 
-The recipes under `june-arch/windows-work/` rebuild the patched apps from a
+The recipes under `windows-work/` rebuild the patched apps from a
 locally supplied factory APK. Keys and blobs must never be committed.

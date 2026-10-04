@@ -6,7 +6,7 @@ friend only needs to flash one file and boot it.
 ## Build
 
 ```bash
-cd june-arch/installer/liveiso
+cd installer/liveiso
 # first copy the installer assets you want to ship into assets/
 bash ./prepare_assets.sh
 bash ./build_live_iso.sh

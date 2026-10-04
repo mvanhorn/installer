@@ -1,5 +1,5 @@
 # Generated payload and images
-june-arch/installer/liveiso/assets/
+installer/liveiso/assets/
 *.iso
 
 # Blobs and secrets: never commit

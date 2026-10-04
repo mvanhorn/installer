@@ -31,15 +31,15 @@ JUNE_LR=/path/to/local-resources JUNE_ROOT=/path/to/June ./prepare_assets.sh
 
 | Input | Default source | Publish |
 |-------|----------------|---------|
-| `deploy_onoven.sh`, `june_bootclear.sh.onoven`, `june_reaper.sh.junelocal` | `june-arch/onoven/` | yes |
-| `generate_certs.sh`, `sign_leaf.sh` | `june-arch/packaging/` | yes |
+| `deploy_onoven.sh`, `june_bootclear.sh.onoven`, `june_reaper.sh.junelocal` | `onoven/` | yes |
+| `generate_certs.sh`, `sign_leaf.sh` | `packaging/` | yes |
 | `install.sh`, `backup.sh` | embedded in `prepare_assets.sh` | yes |
-| `june-local`, `june-camerad` armv7 binaries | `june-arch/golocal/bin/` | prefer publishing `june-arch/golocal/` source |
-| `companions_state.json` | `june-arch/` | yes |
-| `boot_junelocal_init.img` | `june-arch/tools/orchestrator/` | no; publish `build_boot_junelocal_init.py` + `jcm_apply.sh` and build it |
+| `june-local`, `june-camerad` armv7 binaries | `golocal/bin/` | prefer publishing `golocal/` source |
+| `companions_state.json` | repo root | yes |
+| `boot_junelocal_init.img` | `tools/orchestrator/` | no; publish `build_boot_junelocal_init.py` + `jcm_apply.sh` and build it |
 | `JuneCloudMessaging.apk` | `june-rcm/healthy-build/…` | **no** (June proprietary) |
-| `JuneCloudMessaging_nopin_signed.apk` | `june-arch/windows-work/jcm-pinning/` | **no** (modified June app) |
-| `companion_endpoint_signed.apk` | `june-arch/windows-work/companion-endpoint/` | **no** |
+| `JuneCloudMessaging_nopin_signed.apk` | `windows-work/jcm-pinning/` | **no** (modified June app) |
+| `companion_endpoint_signed.apk` | `windows-work/companion-endpoint/` | **no** |
 | `junelife_chain_godaddy_intermediate.crt`, `june-local.key` | `June/tools/certs/` | **no** — contains June's private key |
 | `tegrarcm`, `jetson-tk1.bct`, `u-boot-dtb-tegra.bin` | `june-rcm/` | no (June/NVIDIA firmware) |
 

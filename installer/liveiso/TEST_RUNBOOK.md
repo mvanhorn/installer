@@ -50,7 +50,7 @@ Known limitation:
 ## Rebuild commands
 
 ```bash
-cd june-arch/installer/liveiso
+cd installer/liveiso
 bash ./prepare_assets.sh
 bash ./build_live_iso.sh
 ```
@@ -76,7 +76,7 @@ Ventoy release used: 1.1.17
 To make the Ventoy stick auto-boot the June ISO instead of waiting at two
 menus, put a `ventoy/ventoy.json` file on the Ventoy data partition. See:
 
-`june-arch/installer/liveiso/ventoy.json.example`
+`installer/liveiso/ventoy.json.example`
 
 The live ISO bootloader timeout was also reduced to 1 second in `build.sh`.
 
@@ -164,9 +164,9 @@ data partition after reboot.
 
 ## Files changed recently
 
-- `june-arch/installer/liveiso/build.sh`
-- `june-arch/installer/liveiso/build_live_iso.sh`
-- `june-arch/installer/liveiso/prepare_assets.sh`
-- `june-arch/installer/liveiso/README.md`
+- `installer/liveiso/build.sh`
+- `installer/liveiso/build_live_iso.sh`
+- `installer/liveiso/prepare_assets.sh`
+- `installer/liveiso/README.md`
 
 These changes are not necessarily committed yet.
