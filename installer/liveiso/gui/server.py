@@ -413,6 +413,10 @@ class App:
 
     # ---- network / phone access ---------------------------------------
 
+    def is_own_address(self, ip: str) -> bool:
+        with self.lock:
+            return ip in self.ips or (bool(self.advertise_host) and ip == self.advertise_host)
+
     def addresses(self) -> list[str]:
         if self.advertise_host:
             return [self.advertise_host]
@@ -676,10 +680,17 @@ class Handler(BaseHTTPRequestHandler):
         return peer
 
     def is_local(self) -> bool:
+        """Loopback, or one of this machine's own addresses: a browser on the
+        installer PC itself is as trusted as the kiosk.  (A TCP connection
+        cannot complete with a spoofed source address, so a LAN client cannot
+        pose as one of ours.)"""
+        ip = self.client_ip()
         try:
-            return ipaddress.ip_address(self.client_ip()).is_loopback
+            if ipaddress.ip_address(ip).is_loopback:
+                return True
         except ValueError:
             return False
+        return self.app.is_own_address(ip)
 
     def cookie_token(self) -> str:
         for part in (self.headers.get("Cookie") or "").split(";"):
@@ -693,9 +704,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.is_local():
             return True
         app = self.app
+        token = (query.get("k") or [""])[0] or self.cookie_token()
+        self.presented_token = bool(token)
         if not app.remote_enabled:
             return False
-        token = (query.get("k") or [""])[0] or self.cookie_token()
         return secrets.compare_digest(token, app.token)
 
     # ---- responses -----------------------------------------------------
@@ -724,6 +736,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self.app.remote_enabled:
             return ("Phone access is off",
                     "Turn on <b>Connect a phone</b> on the installer screen, then scan the QR code.")
+        if not getattr(self, "presented_token", False):
+            return ("Scan the QR code to connect",
+                    "Open <b>Phone</b> on the installer screen and scan the code with this device. "
+                    "The code lets this device in; the plain address does not.")
         return ("This code no longer works",
                 "Scan the QR code that is on the installer screen now. A new code is made each time "
                 "phone access is turned off or the installer restarts.")
