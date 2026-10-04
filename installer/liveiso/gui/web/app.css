@@ -128,6 +128,7 @@ p { margin: 0 0 12px; line-height: 1.45; font-size: 17px; }
 .tile .tag { position: absolute; top: 16px; right: 16px; padding: 4px 8px; border-radius: 6px; font: 700 11px/1 var(--f); letter-spacing: .08em; text-transform: uppercase; background: rgba(255,122,46,.16); color: var(--ember2); box-shadow: inset 0 0 0 1px var(--tRim); }
 .tile.grey { background: linear-gradient(180deg, var(--uA), var(--uB)); box-shadow: inset 0 0 0 1px var(--uRim); }
 .tile.grey:hover { box-shadow: inset 0 0 0 1px var(--fg2); }
+.tile .glyph.wide { width: 112px; height: 56px; }
 .tile.grey .glyph { color: var(--uGlyph); filter: none; }
 .tiles.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
@@ -311,6 +312,7 @@ details.log[open] summary svg { transform: rotate(90deg); }
   .icon-btn-label { display: none; }
   .tile { min-height: 156px; padding: 14px; }
   .tile .glyph { width: 44px; height: 44px; top: 14px; left: 14px; }
+  .tile .glyph.wide { width: 88px; height: 44px; }
   .tile-name { font-size: 19px; }
   .tile-sub { display: none; }
   .fields { grid-template-columns: 1fr; }

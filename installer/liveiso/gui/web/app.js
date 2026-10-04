@@ -24,8 +24,9 @@ const GLYPH = {
   // The June oven itself: the Project July mark, not the generic range icon.
   install: '<svg class="glyph glyph-mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#i-mark"/></svg>',
   custom: icon("key", "glyph"),
-  backup: icon("backup", "glyph"),
-  restore: icon("restore", "glyph"),
+  // Oven -> USB stick and back: what the job actually does.
+  backup: '<svg class="glyph wide" viewBox="0 0 48 24" aria-hidden="true"><use href="#i-backup"/></svg>',
+  restore: '<svg class="glyph wide" viewBox="0 0 48 24" aria-hidden="true"><use href="#i-restore"/></svg>',
   more: icon("sliders", "glyph"),
   phone: icon("phone", "glyph"),
 };
