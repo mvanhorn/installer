@@ -47,6 +47,16 @@ cp "$ARCH/windows-work/mediacapturer-pinning/MediaCapturer_nopin_signed.apk" "$D
 cp "$ARCH/windows-work/analytics-pinning/Analytics_nopin_signed.apk" "$DEST/"
 cp "$ARCH/windows-work/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
 cp "$ARCH/onoven/oven-light/OvenLight_signed.apk" "$DEST/"
+# Chef cook-modes patch (optional). Built from the user's own stock Chef APK
+# with windows-work/chef-cookmodes/build_patched.sh; June's assets are not
+# published. Without it the oven keeps the stock primitive whitelist.
+CHEF_APK="$ARCH/windows-work/chef-cookmodes/Chef_cookmodes_signed.apk"
+if [ -f "$CHEF_APK" ]; then
+  cp "$CHEF_APK" "$DEST/"
+  echo "[*] Chef cook-modes patch included: $(du -h "$CHEF_APK" | cut -f1)"
+else
+  echo "[!] Chef cook-modes patch not found at $CHEF_APK; toast/other remote modes stay stock" >&2
+fi
 # Presets/recipes content mirror (catalog + program bundles). June's content is
 # licensed material: it is used here for personal/local installs only and is
 # deliberately NOT published in the source repo (see PUBLISHING.md). Point
@@ -84,6 +94,12 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-prepackaged}"
 JCM_PERSIST=0
+# Optional Chef cook-modes payload (widened primitive whitelist + plan_index).
+CHEF_SRC=""
+if [ -f "$DIR/Chef_cookmodes_signed.apk" ]; then
+  CHEF_SRC="$DIR/Chef_cookmodes_signed.apk"
+  export CHEF_SRC
+fi
 EXPECTED_SIZE="7818182656"
 TEGRARCM="$DIR/tegrarcm"
 GUIDE_URL="https://project-july.org/setup"
@@ -403,6 +419,10 @@ fi
 if [ -n "${ANALYTICS_SRC:-}" ]; then
   echo "[debug] ANALYTICS_SRC=$(basename "$ANALYTICS_SRC")"
   installer_hashes+=("$ANALYTICS_SRC")
+fi
+if [ -n "${CHEF_SRC:-}" ]; then
+  echo "[debug] CHEF_SRC=$(basename "$CHEF_SRC")"
+  installer_hashes+=("$CHEF_SRC")
 fi
 sha256sum "${installer_hashes[@]}"
 

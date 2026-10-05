@@ -24,8 +24,9 @@ onoven/              on-oven deploy scripts
 packaging/           certificate generation (generate_certs.sh, sign_leaf.sh)
 tools/orchestrator/  boot image builder (build_boot_junelocal_init.py) and the
                      jcm_apply.sh fallback service
-windows-work/        APK no-pin patch recipes (jcm-pinning, remotes-pinning,
-                     mediacapturer-pinning, analytics-pinning)
+windows-work/        APK patch recipes (jcm/remotes/mediacapturer/analytics
+                     no-pin, chef-cookmodes remote primitive whitelist +
+                     plan_index)
 ```
 
 Point `prepare_assets.sh` at this checkout with `JUNE_LR` (it defaults to the
@@ -58,12 +59,20 @@ bash build_live_iso.sh          # writes june-local-live.iso
 resulting ISO to a Ventoy stick (`flash_to_ventoy.sh`), boot the target
 machine from it, and follow the on-screen menu.
 
+Remote toast levels and the other non-bake primitives need the optional Chef
+patch. Build it from your own extracted Chef APK with
+`windows-work/chef-cookmodes/build_patched.sh`; `prepare_assets.sh` picks up
+`Chef_cookmodes_signed.apk` when it is present and the installer stages it
+through the same boot-time applier as the other patched priv-apps. Without it
+the installer leaves the stock Chef whitelist in place.
+
 ## Not included
 
 - June APKs (`JuneCloudMessaging.apk`, `Remotes.apk`, companion endpoint)
 - June's TLS key and the prepackaged GoDaddy chain
 - NVIDIA/June firmware blobs (`tegrarcm`, `jetson-tk1.bct`, `u-boot-dtb-tegra.bin`)
 - Prebuilt armv7 binaries (`june-local`, `june-camerad`) and the boot image
+- The stock and patched Chef APK (`Chef.apk` / `Chef_cookmodes_signed.apk`)
 
 The recipes under `windows-work/` rebuild the patched apps from a
 locally supplied factory APK. Keys and blobs must never be committed.

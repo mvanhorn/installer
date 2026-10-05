@@ -104,6 +104,7 @@ JCM_SRC="${JCM_SRC:-$ROOT/local-resources/june-rcm/healthy-build/decrypted-priv-
 REMOTES_SRC="${REMOTES_SRC:-}"
 MEDIACAPTURER_SRC="${MEDIACAPTURER_SRC:-}"
 ANALYTICS_SRC="${ANALYTICS_SRC:-}"
+CHEF_SRC="${CHEF_SRC:-}"
 LIGHT_SRC="${LIGHT_SRC:-$SRC_DIR/OvenLight_signed.apk}"
 BOOTCLEAR_SRC="${BOOTCLEAR_SRC:-$SRC_DIR/june_bootclear.sh.onoven}"
 JUNE_REAPER_SRC="${JUNE_REAPER_SRC:-$SRC_DIR/june_reaper.sh.junelocal}"
@@ -111,6 +112,7 @@ COMPANION_STATE_SRC="${COMPANION_STATE_SRC:-$ROOT/local-resources/june-arch/comp
 BOOT_SRC="${BOOT_SRC:-$ROOT/local-resources/june-arch/tools/orchestrator/boot_junelocal_init.img}"
 FLASH_BOOT="${FLASH_BOOT:-1}"
 JCM_PERSIST="${JCM_PERSIST:-0}"
+CHEF_PERSISTED=0
 
 APP_OFF=$((92928 * 512))
 UDA_OFF=$((8039680 * 512))
@@ -263,6 +265,35 @@ install_system_files() {
     rm -f "$mnt/etc/june/mediacapturer_nopin.apk"
   fi
 
+  # Chef (cook modes): widens the remote primitive whitelist and carries an
+  # optional plan_index for toast levels and other multi-plan primitives. Chef
+  # is a priv-app, so the APK is staged here and swapped into the collector
+  # volume by june_reaper at boot. It is ~240 MB, so persist it only when the
+  # partition has room; otherwise the /data staging below covers one boot.
+  if [ -n "$CHEF_SRC" ] && [ "$JCM_PERSIST" = "1" ]; then
+    chef_size="$(stat -c '%s' "$CHEF_SRC" 2>/dev/null || echo 0)"
+    chef_need_kb=$(( (chef_size + 1023) / 1024 + 8192 ))
+    chef_avail_kb="$(df -Pk "$mnt" 2>/dev/null | awk 'NR==2 {print $4}')"
+    if [ "${chef_avail_kb:-0}" -ge "$chef_need_kb" ]; then
+      mkdir -p "$mnt/etc/june"
+      if install -m 0644 "$CHEF_SRC" "$mnt/etc/june/chef_cookmodes.apk"; then
+        chef_dst_sha="$(sha256sum "$mnt/etc/june/chef_cookmodes.apk" | awk '{print $1}')"
+        chef_src_sha="$(sha256sum "$CHEF_SRC" | awk '{print $1}')"
+        if [ "$chef_dst_sha" = "$chef_src_sha" ]; then
+          CHEF_PERSISTED=$((CHEF_PERSISTED + 1))
+          echo "[+] persistent Chef patch staged on $mnt/etc/june/chef_cookmodes.apk ($chef_size bytes)"
+        else
+          echo "[!] persistent Chef patch write mismatch on $mnt; will stage in /data" >&2
+          rm -f "$mnt/etc/june/chef_cookmodes.apk"
+        fi
+      else
+        echo "[!] persistent Chef patch write failed on $mnt; will stage in /data" >&2
+      fi
+    else
+      echo "[!] not enough space on $mnt for the Chef patch (need $(( chef_need_kb / 1024 )) MB, have $(( ${chef_avail_kb:-0} / 1024 )) MB); will stage in /data" >&2
+    fi
+  fi
+
   # Analytics is a plain /system/app package and pins the same June cert. It
   # is not used for cooking, so replacing it only stops the constant TLS
   # retry noise; it is safe to install directly.
@@ -321,6 +352,9 @@ fi
 if [ -n "$ANALYTICS_SRC" ]; then
   required_sources+=("$ANALYTICS_SRC")
 fi
+if [ -n "$CHEF_SRC" ]; then
+  required_sources+=("$CHEF_SRC")
+fi
 if [ -n "$CA_SRC" ]; then
   required_sources+=("$CA_SRC")
 fi
@@ -344,6 +378,11 @@ if [ -n "$MEDIACAPTURER_SRC" ]; then
 fi
 if [ -n "$ANALYTICS_SRC" ]; then
   echo "[*] analytics: $ANALYTICS_SRC"
+fi
+if [ -n "$CHEF_SRC" ]; then
+  echo "[*] chef: $CHEF_SRC ($(stat -c '%s' "$CHEF_SRC") bytes)"
+else
+  echo "[i] Chef cook-modes patch not staged (optional)"
 fi
 echo "[*] light: $LIGHT_SRC"
 echo "[*] jcm persistence: $JCM_PERSIST (1 = /system, 0 = /data)"
@@ -468,6 +507,34 @@ else
   rm -f "$UDA_MNT/june/mediacapturer_nopin.apk"
 fi
 
+# Chef cook-modes patch. When it could not be persisted in both system
+# partitions, stage a /data copy: june_reaper applies it on the next boot and
+# removes the staged file afterwards. A persistent /system copy wins on the
+# next boot; the /data copy stays as a post-factory-reset fallback.
+if [ -n "$CHEF_SRC" ]; then
+  if [ "${CHEF_PERSISTED:-0}" -ge 2 ]; then
+    echo "[ ] Chef patch persisted in both system partitions; skipping /data staging"
+  else
+    chef_size="$(stat -c '%s' "$CHEF_SRC" 2>/dev/null || echo 0)"
+    chef_need_kb=$(( ((chef_size + 1023) / 1024) * 2 + 65536 ))
+    chef_avail_kb="$(df -Pk "$UDA_MNT" 2>/dev/null | awk 'NR==2 {print $4}')"
+    if [ "${chef_avail_kb:-0}" -ge "$chef_need_kb" ]; then
+      install -m 0644 "$CHEF_SRC" "$UDA_MNT/june/chef_cookmodes.apk"
+      chef_dst_sha="$(sha256sum "$UDA_MNT/june/chef_cookmodes.apk" | awk '{print $1}')"
+      chef_src_sha="$(sha256sum "$CHEF_SRC" | awk '{print $1}')"
+      if [ "$chef_dst_sha" != "$chef_src_sha" ]; then
+        echo "[-] /data Chef APK write mismatch" >&2
+        echo "    src: $chef_src_sha" >&2
+        echo "    dst: $chef_dst_sha" >&2
+        exit 1
+      fi
+      echo "[+] Chef patch staged in /data/june/chef_cookmodes.apk ($chef_size bytes; applied on next boot)"
+    else
+      echo "[!] not enough space on /data for the Chef patch (need $(( chef_need_kb / 1024 )) MB, have $(( ${chef_avail_kb:-0} / 1024 )) MB); cook modes stay stock" >&2
+    fi
+  fi
+fi
+
 # Presets/recipes content mirror: june-local serves the catalog and program
 # bundles from /capture/upstream-content (june_reaper links /capture to /data),
 # which is what guided programs such as Proof and Slow Cook load.
@@ -493,8 +560,8 @@ LOOP_UDA=""
 
 echo "[+] deployed. SHA256 of staged files:"
 if [ "$FLASH_BOOT" = "1" ]; then
-  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
+  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"} ${CHEF_SRC:+"$CHEF_SRC"}
 else
-  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
+  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"} ${CHEF_SRC:+"$CHEF_SRC"}
 fi
 echo "[+] power-cycle the oven normally; the junelocal init service starts june-local at boot_completed."

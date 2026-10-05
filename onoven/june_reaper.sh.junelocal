@@ -108,6 +108,14 @@ elif [ -f /data/june/mediacapturer_nopin.apk ]; then
    MEDIACAPTURER_STAGE=/data/june/mediacapturer_nopin.apk
 fi
 
+# --- June Local: pick the staged Chef (cook modes) patch, if any ------------
+CHEF_STAGE=""
+if [ -f /system/etc/june/chef_cookmodes.apk ]; then
+   CHEF_STAGE=/system/etc/june/chef_cookmodes.apk
+elif [ -f /data/june/chef_cookmodes.apk ]; then
+   CHEF_STAGE=/data/june/chef_cookmodes.apk
+fi
+
 ANY_STAGE=""
 if [ -n "$JCM_STAGE" ]; then
    ANY_STAGE=1
@@ -116,6 +124,9 @@ if [ -n "$REMOTES_STAGE" ]; then
    ANY_STAGE=1
 fi
 if [ -n "$MEDIACAPTURER_STAGE" ]; then
+   ANY_STAGE=1
+fi
+if [ -n "$CHEF_STAGE" ]; then
    ANY_STAGE=1
 fi
 
@@ -205,6 +216,9 @@ if [ -n "$REMOTES_STAGE" ]; then
 fi
 if [ -n "$MEDIACAPTURER_STAGE" ]; then
    apply_staged_apk "$MEDIACAPTURER_STAGE" /system/priv-app/MediaCapturer/MediaCapturer.apk mediacapturer
+fi
+if [ -n "$CHEF_STAGE" ]; then
+   apply_staged_apk "$CHEF_STAGE" /system/priv-app/Chef/Chef.apk chef
 fi
 
 # --- June Local: mDNS hostname + content mirror ----------------------------
