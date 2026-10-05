@@ -46,6 +46,7 @@ cp "$ARCH/windows-work/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
 cp "$ARCH/windows-work/mediacapturer-pinning/MediaCapturer_nopin_signed.apk" "$DEST/"
 cp "$ARCH/windows-work/analytics-pinning/Analytics_nopin_signed.apk" "$DEST/"
 cp "$ARCH/windows-work/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
+cp "$ARCH/onoven/oven-light/OvenLight_signed.apk" "$DEST/"
 # Presets/recipes content mirror (catalog + program bundles). June's content is
 # licensed material: it is used here for personal/local installs only and is
 # deliberately NOT published in the source repo (see PUBLISHING.md). Point

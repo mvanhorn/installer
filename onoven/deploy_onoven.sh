@@ -104,6 +104,7 @@ JCM_SRC="${JCM_SRC:-$ROOT/local-resources/june-rcm/healthy-build/decrypted-priv-
 REMOTES_SRC="${REMOTES_SRC:-}"
 MEDIACAPTURER_SRC="${MEDIACAPTURER_SRC:-}"
 ANALYTICS_SRC="${ANALYTICS_SRC:-}"
+LIGHT_SRC="${LIGHT_SRC:-$SRC_DIR/OvenLight_signed.apk}"
 BOOTCLEAR_SRC="${BOOTCLEAR_SRC:-$SRC_DIR/june_bootclear.sh.onoven}"
 JUNE_REAPER_SRC="${JUNE_REAPER_SRC:-$SRC_DIR/june_reaper.sh.junelocal}"
 COMPANION_STATE_SRC="${COMPANION_STATE_SRC:-$ROOT/local-resources/june-arch/companions_state.json}"
@@ -282,6 +283,24 @@ install_system_files() {
     fi
   fi
 
+  # June Light Bridge: tiny exported service that june-local starts to drive
+  # CookManager's AxonService lighting scenes while the camera is viewed.
+  if [ -f "$LIGHT_SRC" ]; then
+    mkdir -p "$mnt/app/JuneLight"
+    install -m 0644 "$LIGHT_SRC" "$mnt/app/JuneLight/JuneLight.apk"
+    light_dst_sha="$(sha256sum "$mnt/app/JuneLight/JuneLight.apk" | awk '{print $1}')"
+    light_src_sha="$(sha256sum "$LIGHT_SRC" | awk '{print $1}')"
+    if [ "$light_dst_sha" != "$light_src_sha" ]; then
+      echo "[-] June Light Bridge APK write mismatch on $mnt" >&2
+      echo "    src: $light_src_sha" >&2
+      echo "    dst: $light_dst_sha" >&2
+      exit 1
+    fi
+    echo "[+] June Light Bridge installed on $mnt/app/JuneLight/JuneLight.apk"
+  else
+    echo "[!] June Light Bridge APK not found at $LIGHT_SRC; interior light wake disabled" >&2
+  fi
+
   if ! grep -qE '^127\.0\.0\.1[[:space:]]+api\.junelife\.com([[:space:]]|$)' "$mnt/etc/hosts"; then
     printf '\n127.0.0.1 api.junelife.com\n' >> "$mnt/etc/hosts"
   fi
@@ -292,6 +311,7 @@ install_system_files() {
 }
 
 required_sources=("$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC")
+required_sources+=("$LIGHT_SRC")
 if [ -n "$REMOTES_SRC" ]; then
   required_sources+=("$REMOTES_SRC")
 fi
@@ -325,6 +345,7 @@ fi
 if [ -n "$ANALYTICS_SRC" ]; then
   echo "[*] analytics: $ANALYTICS_SRC"
 fi
+echo "[*] light: $LIGHT_SRC"
 echo "[*] jcm persistence: $JCM_PERSIST (1 = /system, 0 = /data)"
 echo "[*] companions: $COMPANION_STATE_SRC"
 echo "[*] boot:   $BOOT_SRC (flash=$FLASH_BOOT)"
@@ -472,8 +493,8 @@ LOOP_UDA=""
 
 echo "[+] deployed. SHA256 of staged files:"
 if [ "$FLASH_BOOT" = "1" ]; then
-  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
+  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
 else
-  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
+  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
 fi
 echo "[+] power-cycle the oven normally; the junelocal init service starts june-local at boot_completed."
