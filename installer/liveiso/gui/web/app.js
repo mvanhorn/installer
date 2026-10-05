@@ -227,6 +227,9 @@ function viewOptions() {
     body = `
       <h2>Install June Local on this oven</h2>
       <p class="muted">The oven keeps June's certificate and its factory messaging app, so the June app works as before, but talks to June Local instead of June's cloud.</p>
+      <div class="fields">
+        <div class="field"><label for="f-name">Oven name</label><input id="f-name" name="name" autocomplete="off" spellcheck="false" value="${esc(f.name == null ? "june" : f.name)}"><div class="hint">Used for the oven's mDNS name &lt;name&gt;.local. The prepackaged certificate covers june.local; use the oven IP for HTTPS with a custom name.</div></div>
+      </div>
       <div class="opts">
         ${opt("persist", "Keep the no-pin patch after a factory reset", "Off by default. Only needed if you plan to switch this oven to your own CA later.", f.persist)}
       </div>`;
@@ -487,6 +490,7 @@ function jobResult(j) {
     body = `<ul class="result-list">${reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`;
   }
   const saved = j.saved_to ? `<p class="muted small" style="margin-top:16px">Log saved to ${esc(j.saved_to)}</p>` : "";
+  const powerNote = ok ? `<p class="muted small" style="margin-top:14px">Remove the USB stick before restarting this computer so the live installer does not boot again.</p>` : "";
   return `
     <div class="run">
       <div>
@@ -496,9 +500,13 @@ function jobResult(j) {
         <div class="bar ${ok ? "ok" : "bad"}"><i></i></div>
         ${body}
         ${saved}
+        ${powerNote}
         <div class="actions">
-          ${ok ? `<button class="btn" type="button" data-do="dismiss">Done</button>`
-               : `<button class="btn" type="button" data-do="retry">Try again</button><button class="btn ghost" type="button" data-do="dismiss">Back to start</button>`}
+          ${ok ? `
+            <button class="btn ${ui.armed === "reboot" ? "danger" : ""}" type="button" data-do="reboot">${ui.armed === "reboot" ? "Tap again to restart" : "Restart this computer"}</button>
+            <button class="btn ghost ${ui.armed === "poweroff" ? "danger" : ""}" type="button" data-do="poweroff">${ui.armed === "poweroff" ? "Tap again to shut down" : "Shut down"}</button>
+            <button class="btn ghost" type="button" data-do="dismiss">Back to start</button>`
+          : `<button class="btn" type="button" data-do="retry">Try again</button><button class="btn ghost" type="button" data-do="dismiss">Back to start</button>`}
         </div>
         ${logDetails()}
       </div>
@@ -687,6 +695,7 @@ function onInput(inp) {
 function jobBody() {
   const f = ui.form;
   const body = { action: ui.action, persist: !!f.persist };
+  if (ui.action === "install") Object.assign(body, { name: f.name == null ? "june" : f.name });
   if (ui.action === "custom") Object.assign(body, { ip: f.ip, host: f.host == null ? "oven.local" : f.host });
   if (ui.action === "backup") Object.assign(body, { dest: f.dest, folder: f.folder || "", filename: f.filename || defaultFilename() });
   if (ui.action === "restore") Object.assign(body, { dest: f.dest, folder: f.folder || "", image: f.image, confirm: f.confirm });
@@ -750,8 +759,9 @@ async function onDo(k, el) {
     case "reboot": case "poweroff":
       if (ui.armed !== k) {
         ui.armed = k;
-        renderMoreSheet();
-        setTimeout(() => { if (ui.armed === k) { ui.armed = ""; if (sheetOpen === "more") renderMoreSheet(); } }, 4000);
+        render();
+        if (sheetOpen === "more") renderMoreSheet();
+        setTimeout(() => { if (ui.armed === k) { ui.armed = ""; render(); if (sheetOpen === "more") renderMoreSheet(); } }, 4000);
         return;
       }
       ui.armed = "";

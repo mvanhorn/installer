@@ -8,9 +8,9 @@ Created: 2026-09-27 (US/Pacific)
   `/dev/sdX` names)
 - Boot setup: Ventoy 1.1.17
 - ISO on Ventoy data partition: `june-local-live.iso`
-- Build: `20261005-0119-9130bb89`
+- Build: `20261005-0159-d8748b01`
 - ISO SHA256:
-  `1221ff236835ca316eb279a29165e22801dac6594f68a12e5acb8b0e90bfa56a`
+  `9c74943fa2acf4f62ca1f0c0ebd66803c21ac7bce7d87fe0bfb15ad419bed76f`
 
 The same USB stick is expected to hold both the installer ISO and any eMMC
 backup images because Ventoy's exFAT partition is writable.

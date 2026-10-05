@@ -61,8 +61,8 @@ want real UI instead of the mockups.
 The tutorial should always use the current release hash. Example for the
 2026-10-05 build:
 
-- Build: `20261005-0119-9130bb89`
-- SHA256: `1221ff236835ca316eb279a29165e22801dac6594f68a12e5acb8b0e90bfa56a`
+- Build: `20261005-0159-d8748b01`
+- SHA256: `9c74943fa2acf4f62ca1f0c0ebd66803c21ac7bce7d87fe0bfb15ad419bed76f`
 
 Project-specific facts to keep in the captions: **keep the Ventoy label**;
 **exFAT or NTFS, never FAT32** (the oven backup is ~7.3 GB); leave ~8 GB free;

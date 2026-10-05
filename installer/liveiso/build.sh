@@ -48,6 +48,8 @@ libstdc++6
 cage
 cog
 xwayland
+adwaita-icon-theme
+xcursor-themes
 seatd
 libgl1-mesa-dri
 libegl-mesa0
@@ -898,10 +900,16 @@ lb build
 # GUI preflight: the graphical installer must not ship with a missing kiosk
 # dependency. Debian bookworm's cage requires /usr/bin/Xwayland even though cog
 # only uses Wayland; without it the kiosk falls back to the text UI.
-gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland"
+gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland usr/share/icons/Adwaita/cursors/left_ptr"
 for rel in $gui_required; do
-  if [ ! -x "chroot/$rel" ]; then
+  if [ ! -e "chroot/$rel" ]; then
     echo "BUILD CHECK FAILED: chroot/$rel is missing; the graphical installer would fall back to text." >&2
+    exit 1
+  fi
+done
+for rel in usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland; do
+  if [ ! -x "chroot/$rel" ]; then
+    echo "BUILD CHECK FAILED: chroot/$rel is not executable." >&2
     exit 1
   fi
 done
@@ -911,6 +919,14 @@ if ! grep -q 'cog --platform=wl' chroot/usr/local/bin/june-kiosk; then
 fi
 if ! grep -q 'Xwayland' chroot/usr/local/bin/june-kiosk; then
   echo "BUILD CHECK FAILED: kiosk is missing the Xwayland preflight." >&2
+  exit 1
+fi
+if ! grep -q 'WLR_NO_HARDWARE_CURSORS' chroot/usr/local/bin/june-kiosk; then
+  echo "BUILD CHECK FAILED: kiosk is missing the software-cursor setting." >&2
+  exit 1
+fi
+if ! grep -q 'XCURSOR_THEME' chroot/usr/local/bin/june-kiosk; then
+  echo "BUILD CHECK FAILED: kiosk is missing the cursor theme setting." >&2
   exit 1
 fi
 if ! grep -q 'video render' chroot/usr/lib/live/config/0040-june-seat; then

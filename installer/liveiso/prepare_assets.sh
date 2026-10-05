@@ -372,6 +372,13 @@ else
   OVEN_HOST="${2:-}"
   PERSIST="${3:-}"
   export OVEN_HOST
+  # Be forgiving of older GUI callers that passed only "persist" as the second
+  # argument; the default oven name is used in that case.
+  if [ "$OVEN_HOST" = "persist" ]; then
+    PERSIST="persist"
+    OVEN_HOST=""
+    export OVEN_HOST
+  fi
   if [ "$PERSIST" = "persist" ]; then
     JCM_PERSIST=1
     export JCM_SRC="$DIR/JuneCloudMessaging_nopin_signed.apk"

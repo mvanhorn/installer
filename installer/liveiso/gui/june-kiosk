@@ -20,6 +20,14 @@ chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
 # the live-config component 0040-june-seat authorises for the live user.
 export LIBSEAT_BACKEND=seatd
 
+# Cursor: the minimal live image has no theme by default, and a hardware
+# cursor plane is not always available (especially with the pixman software
+# renderer), which makes the pointer invisible. Force the Adwaita theme and a
+# software cursor.
+export XCURSOR_THEME="${XCURSOR_THEME:-Adwaita}"
+export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
+export WLR_NO_HARDWARE_CURSORS="${WLR_NO_HARDWARE_CURSORS:-1}"
+
 text_menu() {
   persist_log
   clear
@@ -64,6 +72,19 @@ for _ in $(seq 1 40); do
   (exec 3<>/dev/tcp/127.0.0.1/80) 2>/dev/null && break
   sleep 0.5
 done
+
+# Give libinput/seatd a moment to enumerate a late USB mouse or touchpad.
+input_ok=0
+for _ in $(seq 1 20); do
+  if ls /dev/input/event* >/dev/null 2>&1; then
+    input_ok=1
+    break
+  fi
+  sleep 0.5
+done
+if [ "$input_ok" != "1" ]; then
+  echo "=== no /dev/input/event* devices found after 10s; continuing, hotplug may still work" >>"$LOG"
+fi
 
 # GPU rendering first; pixman (software) for machines whose GPU driver or
 # firmware is missing.  A session that dies within 15 s counts as a failed

@@ -495,7 +495,12 @@ class App:
         stdin_text = None
         params: dict = {"persist": persist}
         if action == "install":
-            argv = self.worker("install.sh") + ["prepackaged"] + (["persist"] if persist else [])
+            name = str(body.get("name", "")).strip() or "june"
+            if not HOST_RE.match(name):
+                raise ApiError(400, "The oven name may only contain letters, digits, dots and dashes.")
+            params["name"] = name
+            # Match the text menu's argument order: prepackaged <name> [persist].
+            argv = self.worker("install.sh") + ["prepackaged", name] + (["persist"] if persist else [])
         elif action == "custom":
             ip = str(body.get("ip", "")).strip()
             host = str(body.get("host", "")).strip() or "oven.local"
