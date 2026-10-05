@@ -100,11 +100,22 @@ elif [ -f /data/june/remotes_nopin.apk ]; then
    REMOTES_STAGE=/data/june/remotes_nopin.apk
 fi
 
+# --- June Local: pick the staged MediaCapturer (cook stills) patch, if any --
+MEDIACAPTURER_STAGE=""
+if [ -f /system/etc/june/mediacapturer_nopin.apk ]; then
+   MEDIACAPTURER_STAGE=/system/etc/june/mediacapturer_nopin.apk
+elif [ -f /data/june/mediacapturer_nopin.apk ]; then
+   MEDIACAPTURER_STAGE=/data/june/mediacapturer_nopin.apk
+fi
+
 ANY_STAGE=""
 if [ -n "$JCM_STAGE" ]; then
    ANY_STAGE=1
 fi
 if [ -n "$REMOTES_STAGE" ]; then
+   ANY_STAGE=1
+fi
+if [ -n "$MEDIACAPTURER_STAGE" ]; then
    ANY_STAGE=1
 fi
 
@@ -192,6 +203,9 @@ fi
 if [ -n "$REMOTES_STAGE" ]; then
    apply_staged_apk "$REMOTES_STAGE" /system/priv-app/Remotes/Remotes.apk remotes
 fi
+if [ -n "$MEDIACAPTURER_STAGE" ]; then
+   apply_staged_apk "$MEDIACAPTURER_STAGE" /system/priv-app/MediaCapturer/MediaCapturer.apk mediacapturer
+fi
 
 # --- June Local: mDNS hostname + content mirror ----------------------------
 # Android's NsdService advertises <net.hostname>.local; the installer writes
@@ -226,7 +240,8 @@ fi
          /data/june/logs/capture.jsonl \
          /data/june/logs/june-local.log \
          /data/june/logs/jcm_patch.log \
-         /data/june/logs/remotes_patch.log 2>/dev/null
+         /data/june/logs/remotes_patch.log \
+         /data/june/logs/mediacapturer_patch.log 2>/dev/null
       sleep 5
    done
 ) &

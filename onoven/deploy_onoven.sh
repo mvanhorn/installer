@@ -102,6 +102,8 @@ CA_SRC="${CA_SRC:-}"
 CA_HASH="${CA_HASH:-}"
 JCM_SRC="${JCM_SRC:-$ROOT/local-resources/june-rcm/healthy-build/decrypted-priv-app/JuneCloudMessaging.apk}"
 REMOTES_SRC="${REMOTES_SRC:-}"
+MEDIACAPTURER_SRC="${MEDIACAPTURER_SRC:-}"
+ANALYTICS_SRC="${ANALYTICS_SRC:-}"
 BOOTCLEAR_SRC="${BOOTCLEAR_SRC:-$SRC_DIR/june_bootclear.sh.onoven}"
 JUNE_REAPER_SRC="${JUNE_REAPER_SRC:-$SRC_DIR/june_reaper.sh.junelocal}"
 COMPANION_STATE_SRC="${COMPANION_STATE_SRC:-$ROOT/local-resources/june-arch/companions_state.json}"
@@ -235,6 +237,51 @@ install_system_files() {
     rm -f "$mnt/etc/june/remotes_nopin.apk"
   fi
 
+  # MediaCapturer embeds the same pinned network client and uploads the
+  # cook-time stills to June's cloud. With the pin neutralized and the
+  # project CA trusted, those stills land on june-local instead, where
+  # /1/videos/{id}/start_image rebroadcasts them as local 10011 frames.
+  if [ -n "$MEDIACAPTURER_SRC" ]; then
+    if [ "$JCM_PERSIST" = "1" ]; then
+      mkdir -p "$mnt/etc/june"
+      install -m 0644 "$MEDIACAPTURER_SRC" "$mnt/etc/june/mediacapturer_nopin.apk"
+      mc_dst_sha="$(sha256sum "$mnt/etc/june/mediacapturer_nopin.apk" | awk '{print $1}')"
+      mc_src_sha="$(sha256sum "$MEDIACAPTURER_SRC" | awk '{print $1}')"
+      if [ "$mc_dst_sha" != "$mc_src_sha" ]; then
+        echo "[-] persistent MediaCapturer APK write mismatch on $mnt" >&2
+        echo "    src: $mc_src_sha ($(stat -c '%s' "$MEDIACAPTURER_SRC") bytes)" >&2
+        echo "    dst: $mc_dst_sha ($(stat -c '%s' "$mnt/etc/june/mediacapturer_nopin.apk") bytes)" >&2
+        exit 1
+      fi
+      echo "[+] persistent MediaCapturer patch staged on $mnt/etc/june/mediacapturer_nopin.apk ($(stat -c '%s' "$MEDIACAPTURER_SRC") bytes)"
+    else
+      rm -f "$mnt/etc/june/mediacapturer_nopin.apk"
+      echo "[ ] MediaCapturer patch will be staged in /data (not persistent across factory reset)"
+    fi
+  else
+    rm -f "$mnt/etc/june/mediacapturer_nopin.apk"
+  fi
+
+  # Analytics is a plain /system/app package and pins the same June cert. It
+  # is not used for cooking, so replacing it only stops the constant TLS
+  # retry noise; it is safe to install directly.
+  if [ -n "$ANALYTICS_SRC" ]; then
+    if [ -f "$mnt/app/Analytics/Analytics.apk" ]; then
+      install -m 0644 "$ANALYTICS_SRC" "$mnt/app/Analytics/Analytics.apk"
+      an_dst_sha="$(sha256sum "$mnt/app/Analytics/Analytics.apk" | awk '{print $1}')"
+      an_src_sha="$(sha256sum "$ANALYTICS_SRC" | awk '{print $1}')"
+      if [ "$an_dst_sha" != "$an_src_sha" ]; then
+        echo "[-] Analytics APK write mismatch on $mnt" >&2
+        echo "    src: $an_src_sha" >&2
+        echo "    dst: $an_dst_sha" >&2
+        exit 1
+      fi
+      echo "[+] Analytics no-pin patch installed on $mnt/app/Analytics/Analytics.apk"
+    else
+      echo "[!] Analytics APK not found on $mnt; skipping Analytics patch" >&2
+    fi
+  fi
+
   if ! grep -qE '^127\.0\.0\.1[[:space:]]+api\.junelife\.com([[:space:]]|$)' "$mnt/etc/hosts"; then
     printf '\n127.0.0.1 api.junelife.com\n' >> "$mnt/etc/hosts"
   fi
@@ -247,6 +294,12 @@ install_system_files() {
 required_sources=("$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC")
 if [ -n "$REMOTES_SRC" ]; then
   required_sources+=("$REMOTES_SRC")
+fi
+if [ -n "$MEDIACAPTURER_SRC" ]; then
+  required_sources+=("$MEDIACAPTURER_SRC")
+fi
+if [ -n "$ANALYTICS_SRC" ]; then
+  required_sources+=("$ANALYTICS_SRC")
 fi
 if [ -n "$CA_SRC" ]; then
   required_sources+=("$CA_SRC")
@@ -263,6 +316,15 @@ echo "[*] camerad: $CAMERAD_SRC"
 echo "[*] cert:   $CERT_SRC"
 echo "[*] key:    $KEY_SRC"
 echo "[*] jcm:    $JCM_SRC"
+if [ -n "$REMOTES_SRC" ]; then
+  echo "[*] remotes: $REMOTES_SRC"
+fi
+if [ -n "$MEDIACAPTURER_SRC" ]; then
+  echo "[*] mediacapturer: $MEDIACAPTURER_SRC"
+fi
+if [ -n "$ANALYTICS_SRC" ]; then
+  echo "[*] analytics: $ANALYTICS_SRC"
+fi
 echo "[*] jcm persistence: $JCM_PERSIST (1 = /system, 0 = /data)"
 echo "[*] companions: $COMPANION_STATE_SRC"
 echo "[*] boot:   $BOOT_SRC (flash=$FLASH_BOOT)"
@@ -366,6 +428,25 @@ else
   rm -f "$UDA_MNT/june/remotes_nopin.apk"
 fi
 
+if [ -n "$MEDIACAPTURER_SRC" ]; then
+  if [ "$JCM_PERSIST" != "1" ]; then
+    install -m 0644 "$MEDIACAPTURER_SRC" "$UDA_MNT/june/mediacapturer_nopin.apk"
+    mc_dst_sha="$(sha256sum "$UDA_MNT/june/mediacapturer_nopin.apk" | awk '{print $1}')"
+    mc_src_sha="$(sha256sum "$MEDIACAPTURER_SRC" | awk '{print $1}')"
+    if [ "$mc_dst_sha" != "$mc_src_sha" ]; then
+      echo "[-] /data MediaCapturer APK write mismatch" >&2
+      echo "    src: $mc_src_sha" >&2
+      echo "    dst: $mc_dst_sha" >&2
+      exit 1
+    fi
+    echo "[+] non-persistent MediaCapturer patch staged in /data/june/mediacapturer_nopin.apk ($(stat -c '%s' "$MEDIACAPTURER_SRC") bytes)"
+  else
+    echo "[ ] persistent MediaCapturer patch staged in /system/etc/june/mediacapturer_nopin.apk"
+  fi
+else
+  rm -f "$UDA_MNT/june/mediacapturer_nopin.apk"
+fi
+
 # Presets/recipes content mirror: june-local serves the catalog and program
 # bundles from /capture/upstream-content (june_reaper links /capture to /data),
 # which is what guided programs such as Proof and Slow Cook load.
@@ -391,8 +472,8 @@ LOOP_UDA=""
 
 echo "[+] deployed. SHA256 of staged files:"
 if [ "$FLASH_BOOT" = "1" ]; then
-  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC"
+  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
 else
-  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC"
+  sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"}
 fi
 echo "[+] power-cycle the oven normally; the junelocal init service starts june-local at boot_completed."

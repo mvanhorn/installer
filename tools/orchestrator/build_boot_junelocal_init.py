@@ -23,7 +23,14 @@ SERVICE_BLOCK = """service junelocal /system/xbin/june-local --cert /system/etc/
     disabled
 """
 
-CAMERAD_SERVICE = """service camerad /system/xbin/june-camerad --dev /dev/video0 --out /data/june/media/prod/images/latest.jpg --relay http://127.0.0.1/internal/video --fps 10 --trigger-url http://127.0.0.1/internal/camera-enabled --config /data/june/camerad.conf --log /data/june/logs/camerad.log
+# The stock cameracapturerd daemon owns /dev/video0. camerad's default
+# --source auto therefore becomes a client of that daemon's Unix socket,
+# serving idle live-view frames without ever opening the V4L2 device. It only
+# connects while golocal's camera-bridge gate says a viewer asked for frames
+# and no cook is active; during a cook MediaCapturer's stills are rebroadcast
+# by june-local instead. --source v4l2 remains the fallback for systems
+# without the stock daemon.
+CAMERAD_SERVICE = """service camerad /system/xbin/june-camerad --source auto --dev /dev/video0 --stock-socket /juneOS2/cameracapturerd-capture.sock --out /data/june/media/prod/images/latest.jpg --relay http://127.0.0.1/internal/video --fps 1 --format 6 --trigger-url http://127.0.0.1/internal/camera-bridge-enabled --config /data/june/camerad.conf --log /data/june/logs/camerad.log
     user root
     group root
     seclabel u:r:init:s0

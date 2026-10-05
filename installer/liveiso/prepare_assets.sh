@@ -5,10 +5,20 @@ cd "$SCRIPT_DIR"
 
 # Paths default to this checkout but can be pointed anywhere, which keeps the
 # payload build usable from a published/source-only tree. See PUBLISHING.md.
-LR="${JUNE_LR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+if [ -z "${JUNE_LR:-}" ]; then
+  if [ -d "$SCRIPT_DIR/../../../june-arch/onoven" ]; then
+    # Development tree: <root>/local-resources/june-arch/installer/liveiso
+    LR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+  else
+    # Flat installer repo: <repo>/installer/liveiso
+    LR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  fi
+else
+  LR="$JUNE_LR"
+fi
 ROOT="${JUNE_ROOT:-$(dirname "$LR")}"
 # This repo is flat (liveiso/, onoven/, ...); the development tree nests the
-# same directories under june-arch/. Support both with JUNE_LR.
+# same directories under june-arch/.
 if [ -d "$LR/june-arch/onoven" ]; then
   ARCH="$LR/june-arch"
 else
@@ -33,6 +43,8 @@ cp "$ROOT/tools/certs/june-local.key" "$DEST/"
 cp "$LR/june-rcm/healthy-build/decrypted-priv-app/JuneCloudMessaging.apk" "$DEST/"
 cp "$ARCH/windows-work/jcm-pinning/JuneCloudMessaging_nopin_signed.apk" "$DEST/"
 cp "$ARCH/windows-work/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
+cp "$ARCH/windows-work/mediacapturer-pinning/MediaCapturer_nopin_signed.apk" "$DEST/"
+cp "$ARCH/windows-work/analytics-pinning/Analytics_nopin_signed.apk" "$DEST/"
 cp "$ARCH/windows-work/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
 # Presets/recipes content mirror (catalog + program bundles). June's content is
 # licensed material: it is used here for personal/local installs only and is
@@ -317,6 +329,13 @@ if [ "$MODE" = "generate" ]; then
   # The oven-side pairing UI (Remotes) uses the same pinned network client, so
   # a per-home CA needs it patched too or pairing fails oven-side.
   export REMOTES_SRC="$DIR/Remotes_nopin_signed.apk"
+  # MediaCapturer also pins June's cert. Patching it lets the cook-time
+  # stills reach june-local (and thus the companion/HA) instead of being
+  # recorded and discarded.
+  export MEDIACAPTURER_SRC="$DIR/MediaCapturer_nopin_signed.apk"
+  # Analytics has the same pin; replacing it stops the once-per-second TLS
+  # retry noise against june-local. Analytics is not used for cooking.
+  export ANALYTICS_SRC="$DIR/Analytics_nopin_signed.apk"
   CA_HASH="$(openssl x509 -in "$DIR/certs/ca.crt" -subject_hash_old -noout)"
   export CA_SRC="$DIR/certs/ca.crt"
   export CA_HASH="$CA_HASH"
@@ -368,7 +387,16 @@ echo "[debug] MODE=$MODE"
 echo "[debug] JCM_PERSIST=$JCM_PERSIST"
 echo "[debug] CERT_SRC=$(basename "$CERT_SRC")"
 echo "[debug] JCM_SRC=$(basename "$JCM_SRC")"
-sha256sum "$CERT_SRC" "$JCM_SRC"
+installer_hashes=("$CERT_SRC" "$JCM_SRC")
+if [ -n "${MEDIACAPTURER_SRC:-}" ]; then
+  echo "[debug] MEDIACAPTURER_SRC=$(basename "$MEDIACAPTURER_SRC")"
+  installer_hashes+=("$MEDIACAPTURER_SRC")
+fi
+if [ -n "${ANALYTICS_SRC:-}" ]; then
+  echo "[debug] ANALYTICS_SRC=$(basename "$ANALYTICS_SRC")"
+  installer_hashes+=("$ANALYTICS_SRC")
+fi
+sha256sum "${installer_hashes[@]}"
 
 wait_for_ums
 
