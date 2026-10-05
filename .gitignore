@@ -21,3 +21,5 @@ ca-tmp/
 *.bct
 *.bin
 upstream-content/
+# Go build output (built with make oven / make camerad)
+golocal/bin/

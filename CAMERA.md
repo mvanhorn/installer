@@ -4,6 +4,8 @@ This is the summary of the on-oven camera work that ships with the installer.
 The detailed reverse-engineering notes live in the development tree at
 `june-arch/docs/camera-local-live-plan.md` and
 `june-arch/docs/camera-settings-findings.md`.
+The Go source for both `june-local` and `june-camerad` is mirrored into this
+repository under `golocal/`; build it with `make -C golocal oven camerad`.
 
 ## The rule: stock `cameracapturerd` owns `/dev/video0`
 

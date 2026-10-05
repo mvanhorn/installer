@@ -15,6 +15,8 @@ must be supplied locally.
 
 ```
 installer/liveiso/   build the ISO (Docker + live-build) and the installer menu
+golocal/             Go source for june-local and june-camerad (make oven,
+                     make camerad); prebuilt binaries are not committed
 onoven/              on-oven deploy scripts
                      deploy_onoven.sh, june_bootclear.sh.onoven,
                      june_reaper.sh.junelocal, oven-light/ (interior-light
@@ -40,6 +42,7 @@ binaries, the flashed boot image). See
 `installer/liveiso/PUBLISHING.md` for the exact list.
 
 ```sh
+cd golocal && make oven camerad && cd ..   # build the armv7 binaries
 cd installer/liveiso
 JUNE_LR=<this-repo> JUNE_ROOT=<tree-with-tools/certs> bash prepare_assets.sh
 bash build_live_iso.sh          # writes june-local-live.iso
