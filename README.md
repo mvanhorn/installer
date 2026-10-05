@@ -17,15 +17,20 @@ must be supplied locally.
 installer/liveiso/   build the ISO (Docker + live-build) and the installer menu
 onoven/              on-oven deploy scripts
                      deploy_onoven.sh, june_bootclear.sh.onoven,
-                     june_reaper.sh.junelocal
+                     june_reaper.sh.junelocal, oven-light/ (interior-light
+                     bridge APK and smali source)
 packaging/           certificate generation (generate_certs.sh, sign_leaf.sh)
 tools/orchestrator/  boot image builder (build_boot_junelocal_init.py) and the
                      jcm_apply.sh fallback service
-windows-work/        APK no-pin patch recipes (jcm-pinning, remotes-pinning)
+windows-work/        APK no-pin patch recipes (jcm-pinning, remotes-pinning,
+                     mediacapturer-pinning, analytics-pinning)
 ```
 
 Point `prepare_assets.sh` at this checkout with `JUNE_LR` (it defaults to the
 repo root) plus the locally supplied blobs.
+
+The camera/live-view/interior-light architecture is summarized in
+[`CAMERA.md`](CAMERA.md).
 
 ## Build
 
