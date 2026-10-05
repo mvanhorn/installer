@@ -30,6 +30,12 @@ mv "config/includes.chroot$PAYLOAD/gui/june-gui.service" config/includes.chroot/
 mv "config/includes.chroot$PAYLOAD/gui/june-kiosk" config/includes.chroot/usr/local/bin/
 chmod +x config/includes.chroot/usr/local/bin/june-kiosk
 
+# wlrctl is not packaged in Debian bookworm; build the vendored copy used by
+# june-kiosk to wake the pointer cursor after cage starts.
+meson setup /build/wlrctl-build /build/vendor/wlrctl -Dman-pages=disabled >/dev/null
+ninja -C /build/wlrctl-build >/dev/null
+install -m 0755 /build/wlrctl-build/wlrctl config/includes.chroot/usr/bin/wlrctl
+
 # Extra runtime packages for the live system (menu UI + deploy dependencies,
 # then the GUI: cage kiosk compositor, cog/WPE WebKit, Mesa for GPU and
 # software rendering, logind seat access, the backend and QR codes).
@@ -900,7 +906,7 @@ lb build
 # GUI preflight: the graphical installer must not ship with a missing kiosk
 # dependency. Debian bookworm's cage requires /usr/bin/Xwayland even though cog
 # only uses Wayland; without it the kiosk falls back to the text UI.
-gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland usr/share/icons/Adwaita/cursors/left_ptr"
+gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland usr/bin/wlrctl usr/share/icons/Adwaita/cursors/left_ptr"
 for rel in $gui_required; do
   if [ ! -e "chroot/$rel" ]; then
     echo "BUILD CHECK FAILED: chroot/$rel is missing; the graphical installer would fall back to text." >&2

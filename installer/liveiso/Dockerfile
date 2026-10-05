@@ -5,11 +5,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     live-build xorriso isolinux syslinux-utils \
     curl ca-certificates git rsync \
+    build-essential meson ninja-build pkg-config \
+    libwayland-dev libxkbcommon-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY assets /build/assets
 COPY gui /build/gui
+COPY vendor /build/vendor
 COPY build.sh /build/build.sh
 RUN chmod +x /build/build.sh
 

@@ -130,6 +130,18 @@ while :; do
       kill -0 "$cage_pid" 2>/dev/null || break
       sleep 0.5
     done
+    # wlroots/cage sometimes draws no cursor until the seat gets an input
+    # device event; an unplug/replug brings it back, so nudge the pointer
+    # once here instead of asking the user to replug the mouse.
+    if [ "$cog_ok" = "1" ] && command -v wlrctl >/dev/null 2>&1; then
+      echo "=== waking the pointer cursor" >>"$LOG"
+      (
+        sleep 1
+        WAYLAND_DISPLAY=wayland-0 wlrctl pointer move 4 4 2>/dev/null
+        sleep 1
+        WAYLAND_DISPLAY=wayland-0 wlrctl pointer move -4 -4 2>/dev/null
+      ) &
+    fi
     if [ "$cog_ok" != "1" ]; then
       echo "=== cog did not start within 15s; treating the renderer as failed" >>"$LOG"
       socket_ok=0
