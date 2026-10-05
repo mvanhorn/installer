@@ -240,6 +240,7 @@ start** button. The details panel and the USB log show the last steps.
 | No usable backup drive | Drive is exFAT/NTFS/ext4 and writable; at least 8 GB free; rescan. |
 | Wrong size on a restore image | The image is not a complete 7.8 GB oven backup. |
 | Secure Boot verification error | Enroll Ventoy’s key or disable Secure Boot. |
+| Graphical installer falls back to text | On builds before 2026-10-05 the kiosk log showed `Cannot find Xwayland binary "/usr/bin/Xwayland"`; the current image includes Xwayland and retries the software renderer. Update the USB image, or use the text UI on the older stick. |
 | Job failed part-way | Do not unplug the oven; use **Try again**. If it repeats, save `june-logs/` and ask for help. |
 
 Assets: `website-assets/png/10-troubleshooting.png`,

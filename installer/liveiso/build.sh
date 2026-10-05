@@ -47,6 +47,7 @@ libusb-1.0-0
 libstdc++6
 cage
 cog
+xwayland
 seatd
 libgl1-mesa-dri
 libegl-mesa0
@@ -105,7 +106,12 @@ Config ()
 {
 	if getent passwd "${LIVE_USERNAME}" >/dev/null 2>&1
 	then
-		usermod -aG seat "${LIVE_USERNAME}" 2>/dev/null || true
+		# seatd provides the DRM/VT session; video/render are a belt-and-braces
+		# fallback for AMD/Intel render nodes when libseat cannot pass them.
+		for grp in seat video render; do
+			getent group "$grp" >/dev/null 2>&1 && \
+				usermod -aG "$grp" "${LIVE_USERNAME}" 2>/dev/null || true
+		done
 	fi
 }
 EOF
