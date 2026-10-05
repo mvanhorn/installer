@@ -385,7 +385,7 @@ def make_installer_ui():
     out.append(f'<rect x="70" y="200" width="1460" height="30" fill="#0f1115"/>')
     out.append(f'<circle cx="120" cy="195" r="18" fill="{EMBER}"/>')
     out.append(text(152, 188, "Project July", size=24, weight="700", fill=FG))
-    out.append(text(152, 214, "June Local installer · build 20261005-0109", size=15, fill=MUTED))
+    out.append(text(152, 214, "June Local installer · build 20261005-0119", size=15, fill=MUTED))
     out.append(pill(1320, 178, "OVEN CONNECTED", fill="#243229", fg=GREEN, size=14))
     out.append(text(100, 300, "What would you like to do?", size=48, weight="300", fill=FG))
 

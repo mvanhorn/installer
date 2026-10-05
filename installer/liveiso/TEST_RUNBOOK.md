@@ -4,11 +4,13 @@ Created: 2026-09-27 (US/Pacific)
 
 ## Current USB state
 
-- Device: `/dev/sda` - 29.9G USB Flash Drive
+- Device: the 29.9G Ventoy USB Flash Drive (check `lsblk`; it moves between
+  `/dev/sdX` names)
 - Boot setup: Ventoy 1.1.17
 - ISO on Ventoy data partition: `june-local-live.iso`
+- Build: `20261005-0119-9130bb89`
 - ISO SHA256:
-  `0a4893374aca5d60f1c772c14953fc90e4fc85d18ba34f0397e10388af126b46`
+  `1221ff236835ca316eb279a29165e22801dac6594f68a12e5acb8b0e90bfa56a`
 
 The same USB stick is expected to hold both the installer ISO and any eMMC
 backup images because Ventoy's exFAT partition is writable.
@@ -32,6 +34,62 @@ If the menu does not auto-open, run:
 ```bash
 june-menu
 ```
+
+## GUI dependency preflight (build-enforced)
+
+The graphical installer uses `cage` (Wayland kiosk), `cog` (WPE WebKit), and
+`seatd` for the DRM/VT seat. Debian bookworm's `cage` starts Xwayland by
+default; without `/usr/bin/Xwayland` it exits before creating the Wayland
+socket and the installer falls back to text.
+
+`build.sh` now fails the ISO build if any of these are missing from the
+chroot:
+
+```
+usr/bin/cage
+usr/bin/cog
+usr/sbin/seatd
+usr/bin/Xwayland
+```
+
+It also checks that the kiosk command contains `cog --platform=wl`, that the
+kiosk script has the Xwayland preflight, and that the live seat hook adds the
+`video`/`render` groups. A successful build prints:
+
+```
+[+] GUI preflight OK: cage, cog, seatd, Xwayland present
+```
+
+The kiosk also checks for Xwayland and seatd at runtime; if either is missing
+it writes a clear line to `/tmp/june-kiosk.log`, persists it to the boot USB
+under `june-logs/`, and falls back to the text installer immediately.
+
+## QEMU graphical-installer smoke test
+
+After a build, boot the ISO headless with KVM:
+
+```bash
+qemu-system-x86_64 -enable-kvm -cpu host -m 4096 -smp 4 -machine q35 \
+  -vga std -display none \
+  -monitor unix:/tmp/june-qmon.sock,server,nowait \
+  -cdrom june-local-live.iso -boot d
+```
+
+Wait for the live system to boot, then capture the screen:
+
+```bash
+echo 'screendump /tmp/june-screen.ppm' | socat - UNIX-CONNECT:/tmp/june-qmon.sock
+ffmpeg -y -i /tmp/june-screen.ppm /tmp/june-screen.png
+```
+
+A pass is the June Local graphical home screen (“What would you like to do?”).
+If it shows the text menu instead, copy `june-kiosk.log` from
+`june-logs/` on the boot USB and check for:
+
+- `Xwayland is missing` — the build preflight should have caught it;
+- `cage watchdog: no Wayland socket` — compositor/seat problem;
+- `amdgpu_cs_ctx_create2 failed` — GPU/render-node problem; the
+  `auto` → `pixman` fallback should recover.
 
 ## Backup on the same Ventoy stick
 

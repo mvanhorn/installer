@@ -895,5 +895,29 @@ EOF
 
 lb build
 
+# GUI preflight: the graphical installer must not ship with a missing kiosk
+# dependency. Debian bookworm's cage requires /usr/bin/Xwayland even though cog
+# only uses Wayland; without it the kiosk falls back to the text UI.
+gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland"
+for rel in $gui_required; do
+  if [ ! -x "chroot/$rel" ]; then
+    echo "BUILD CHECK FAILED: chroot/$rel is missing; the graphical installer would fall back to text." >&2
+    exit 1
+  fi
+done
+if ! grep -q 'cog --platform=wl' chroot/usr/local/bin/june-kiosk; then
+  echo "BUILD CHECK FAILED: kiosk command is missing cog --platform=wl." >&2
+  exit 1
+fi
+if ! grep -q 'Xwayland' chroot/usr/local/bin/june-kiosk; then
+  echo "BUILD CHECK FAILED: kiosk is missing the Xwayland preflight." >&2
+  exit 1
+fi
+if ! grep -q 'video render' chroot/usr/lib/live/config/0040-june-seat; then
+  echo "BUILD CHECK FAILED: live seat hook is missing video/render group setup." >&2
+  exit 1
+fi
+echo "[+] GUI preflight OK: cage, cog, seatd, Xwayland present"
+
 ISO="$(ls -1 live-image-amd64.hybrid.iso)"
 echo "OK -> $ISO"

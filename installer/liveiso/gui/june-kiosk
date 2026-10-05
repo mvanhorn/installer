@@ -42,6 +42,20 @@ if ! command -v cage >/dev/null 2>&1 || ! command -v cog >/dev/null 2>&1; then
   text_menu
 fi
 
+# Debian bookworm's cage starts an XWayland server by default and exits if the
+# binary is absent. Catch that here so the log says exactly why, instead of
+# leaving only the generic cage watchdog message.
+if [ ! -x /usr/bin/Xwayland ]; then
+  echo "Xwayland is missing (/usr/bin/Xwayland); cage cannot start. Starting the text installer." >>"$LOG"
+  text_menu
+fi
+
+# seatd gives cage its DRM/VT session on this logind-less live image.
+if [ ! -x /usr/sbin/seatd ] && [ ! -x /usr/bin/seatd ]; then
+  echo "seatd is missing; cage cannot get a DRM/VT seat. Starting the text installer." >>"$LOG"
+  text_menu
+fi
+
 # Keep kernel messages off the screen while graphics start.
 sudo -n dmesg -n 1 2>/dev/null || true
 
