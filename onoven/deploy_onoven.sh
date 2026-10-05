@@ -170,9 +170,9 @@ install_system_files() {
   # Advertise the configured hostname over mDNS. june_reaper sets net.hostname
   # from this file at boot and Android's NsdService then publishes
   # <name>.local (the certificate already carries the matching SAN).
-  hostname_value="${OVEN_HOST:-june-oven}"
+  hostname_value="${OVEN_HOST:-june}"
   hostname_value="${hostname_value%.local}"
-  [ -n "$hostname_value" ] || hostname_value="june-oven"
+  [ -n "$hostname_value" ] || hostname_value="june"
   printf '%s\n' "$hostname_value" > "$mnt/etc/june_hostname"
   chmod 0644 "$mnt/etc/june_hostname"
   echo "[*] oven hostname: $hostname_value (will advertise $hostname_value.local)"

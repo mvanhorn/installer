@@ -316,7 +316,7 @@ if [ "$MODE" = "generate" ]; then
   PERSIST="${4:-}"
   [ -n "$OVEN_IP" ] || read -rp "Oven LAN IP: " OVEN_IP
   [ -n "$OVEN_HOST" ] || read -rp "Hostname (optional): " OVEN_HOST
-  OVEN_HOST="${OVEN_HOST:-oven.local}"
+  OVEN_HOST="${OVEN_HOST:-june.local}"
   export OVEN_HOST
   if [ "$PERSIST" = "persist" ]; then
     JCM_PERSIST=1
