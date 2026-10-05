@@ -50,7 +50,6 @@ cog
 xwayland
 adwaita-icon-theme
 xcursor-themes
-wlrctl
 seatd
 libgl1-mesa-dri
 libegl-mesa0
@@ -901,7 +900,7 @@ lb build
 # GUI preflight: the graphical installer must not ship with a missing kiosk
 # dependency. Debian bookworm's cage requires /usr/bin/Xwayland even though cog
 # only uses Wayland; without it the kiosk falls back to the text UI.
-gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland usr/bin/wlrctl usr/share/icons/Adwaita/cursors/left_ptr"
+gui_required="usr/bin/cage usr/bin/cog usr/sbin/seatd usr/bin/Xwayland usr/share/icons/Adwaita/cursors/left_ptr"
 for rel in $gui_required; do
   if [ ! -e "chroot/$rel" ]; then
     echo "BUILD CHECK FAILED: chroot/$rel is missing; the graphical installer would fall back to text." >&2
