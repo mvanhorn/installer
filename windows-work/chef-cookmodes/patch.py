@@ -76,7 +76,7 @@ def patch_validator(decoded):
 
     move-result v0
 
-    if-eqz v0, :unsupported
+    if-nez v0, :unsupported
 
     sget-object v0, Lcom/junelife/device/chef/ui/cv/CookPrograms;->PRIMITIVE_PROGRAM_MAP:Ljava/util/HashMap;
 
@@ -336,7 +336,7 @@ def patch_remote_food_load_listener(decoded):
 
     move-result v3
 
-    if-lt v2, v3, :plan_bad
+    if-ge v2, v3, :plan_bad
 
     invoke-virtual {p2, v2}, Lcom/junelife/device/chef/data/model/Food;->selectPlan(I)Lcom/junelife/device/chef/data/model/Plan;
 

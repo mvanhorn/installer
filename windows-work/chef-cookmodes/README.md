@@ -59,8 +59,12 @@ Current build:
 
 ```
 Chef_cookmodes_signed.apk
-sha256 64edf1e4e967489e2eeb195f8a66ea95b6b06caad57043e43da1b93e0e01a137
+sha256 c3825ab018c09c5d63b076afc65afb4774bf13d4a579c6c01cccc96dd65e1475
 ```
+
+The two earlier builds (64edf1e4, then 6a1b2bc9) shipped inverted smali
+branches and were rejected live by Chef ("invalid food name" for bake); the
+c3825ab0 build is the first with both branches verified by re-decoding the APK.
 
 ## Deploy
 
