@@ -33,6 +33,8 @@ repo root) plus the locally supplied blobs.
 
 The camera/live-view/interior-light architecture is summarized in
 [`CAMERA.md`](CAMERA.md).
+The end-user USB recipe (Ventoy, Secure Boot, backup/log/cert layout) is in
+[`CREATE_VENTOY_USB.md`](CREATE_VENTOY_USB.md).
 
 ## Build
 
