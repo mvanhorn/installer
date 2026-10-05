@@ -370,6 +370,23 @@ func TestCameraViewPage(t *testing.T) {
 	}
 }
 
+func TestCatalogGETRoute(t *testing.T) {
+	dir := t.TempDir()
+	catalog := `{"hierarchies":[],"presets":[{"content_id":"bake","url":"https://api.junelife.com/1/presets/bundle/cook_preset/bake/x.jcpb"}],"version":2}`
+	if err := os.WriteFile(filepath.Join(dir, "catalog.json"), []byte(catalog), 0o644); err != nil {
+		t.Fatalf("write catalog: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/1/presets/catalog", nil)
+	rec := httptest.NewRecorder()
+	handleREST(newHub(true, ""), &Config{ContentRoot: dir}, rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET catalog status = %d", rec.Code)
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`http://example.com/1/presets/bundle/`)) {
+		t.Fatalf("GET catalog did not return the rewritten catalog: %s", rec.Body.String())
+	}
+}
+
 func TestMJPEGViewerOpensCameraGate(t *testing.T) {
 	cameraOverrideUntil.Store(0)
 	defer cameraOverrideUntil.Store(0)

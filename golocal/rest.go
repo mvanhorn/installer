@@ -504,7 +504,10 @@ func handleREST(hub *Hub, cfg *Config, w http.ResponseWriter, r *http.Request) {
 
 	// /1/presets — content mirror (catalog + bundles)
 	if len(parts) >= 2 && parts[0] == "1" && parts[1] == "presets" {
-		if r.Method == "POST" && parts[len(parts)-1] == "catalog" {
+		// The stock Chef app POSTs the catalog; probes and other clients often
+		// GET it. Serve both methods so a GET never falls through to the
+		// generic {"success":true} and looks like an empty catalog.
+		if (r.Method == "POST" || r.Method == "GET") && parts[len(parts)-1] == "catalog" {
 			serveCatalog(w, r, cfg)
 			return
 		}
