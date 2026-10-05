@@ -428,6 +428,249 @@ def make_troubleshooting():
     return svg_doc("".join(out))
 
 
+def wizard_steps(active: int, labels=("Options", "Connect oven", "Install")):
+    out = []
+    x, y = 130, 210
+    for i, label in enumerate(labels):
+        color = EMBER if i == active else GREEN if i < active else "#3a3f47"
+        out.append(f'<circle cx="{x}" cy="{y}" r="16" fill="{color}"/>')
+        out.append(text(x, y + 6, str(i + 1), size=17, weight="700", fill="#160a04", anchor="middle"))
+        out.append(text(x + 28, y + 6, label, size=20, fill=FG if i == active else MUTED))
+        x += 210
+    return "".join(out)
+
+
+def make_install_options():
+    out = [title_header("Install June Local · options", "The recommended, simplest install", mockup=True)]
+    out.append(wizard_steps(0))
+    out.append(text(130, 300, "Install June Local on this oven", size=38, weight="300", fill=FG))
+    out.append(paragraph(130, 350, "The oven keeps June's certificate and its factory messaging app, so the June app works as before, but talks to June Local instead of June's cloud.", width=78, size=22, lh=31))
+    out.append(rect(130, 440, 1340, 120, fill=PANEL, rx=14))
+    out.append(rect(160, 475, 34, 34, fill=BG2, stroke=LINE, rx=6))
+    out.append(text(220, 500, "Keep the no-pin patch after a factory reset", size=24, fill=FG))
+    out.append(text(220, 532, "Off by default. Only needed if you plan to switch this oven to your own CA later.", size=19, fill=MUTED))
+    out.append(pill(1360, 486, "OPTIONAL", fill="#2a2e35", fg=EMBER2, size=14))
+    out.append(rect(130, 620, 330, 62, fill=EMBER, rx=12))
+    out.append(text(295, 660, "Next: connect the oven", size=22, weight="700", fill="#160a04", anchor="middle"))
+    out.append(rect(490, 620, 170, 62, fill=BG2, rx=12))
+    out.append(text(575, 660, "Back", size=22, fill=MUTED, anchor="middle"))
+    out.append(card(130, 720, 1340, 100, "What this does", "Installs the local server, the camera bridge, and the project certificate. The factory June app keeps working, but locally.", accent=GREEN, title_size=22, pad=20))
+    out.append(footer("Choose “Install with your own CA” only if you specifically want a per-home certificate authority."))
+    return svg_doc("".join(out))
+
+
+def make_connect_oven():
+    out = [title_header("Put the oven in recovery mode", "Connect the USB cable, hold SW2, then power on", mockup=True)]
+    out.append(wizard_steps(1))
+    out.append(text(130, 300, "Put the oven in recovery mode", size=38, weight="300", fill=FG))
+    # Left illustration card
+    out.append(rect(130, 350, 620, 420, fill=PANEL, rx=16))
+    out.append(rect(170, 400, 200, 140, fill="#1d2128", stroke=LINE, rx=10))
+    out.append(text(270, 465, "computer", size=22, fill=MUTED, anchor="middle"))
+    out.append(rect(370, 500, 80, 40, fill="#1d2128", stroke=LINE, rx=8))
+    out.append(text(410, 528, "USB", size=18, fill=MUTED, anchor="middle"))
+    out.append(f'<path d="M 450 520 C 520 520 540 470 590 470" stroke="{EMBER}" stroke-width="5" fill="none" stroke-dasharray="10 8"/>')
+    out.append(rect(560, 370, 150, 280, fill="#1d2128", stroke=LINE, rx=14))
+    out.append(text(635, 405, "OVEN", size=20, fill=MUTED, anchor="middle"))
+    out.append(f'<circle cx="635" cy="470" r="18" fill="{EMBER}"/>')
+    out.append(text(720, 476, "SW2", size=20, fill=FG))
+    out.append(f'<circle cx="635" cy="560" r="18" fill="{EMBER2}"/>')
+    out.append(text(720, 590, "POWER", size=20, fill=FG))
+    out.append(pill(180, 730, "1", fill=EMBER2, fg="#160a04", size=15))
+    out.append(pill(700, 430, "2", fill=EMBER2, fg="#160a04", size=15))
+    out.append(pill(700, 540, "3", fill=EMBER2, fg="#160a04", size=15))
+
+    # Right instructions
+    out.append(text(810, 380, "1. Connect the oven to this computer with the USB cable.", size=23, fill=FG))
+    out.append(paragraph(810, 415, "Use a port on the computer itself, not a hub.", width=52, size=20, lh=28))
+    out.append(text(810, 500, "2. Press and hold SW2 (force recovery) on the oven's board.", size=23, fill=FG))
+    out.append(paragraph(810, 555, "3. Switch the oven's power on and keep holding SW2 for about 10 seconds.", width=52, size=23, lh=30))
+    out.append(rect(810, 635, 660, 100, fill="#1b2418", stroke="#31512c", rx=14))
+    out.append(text(850, 680, "Oven found · RCM mode", size=26, weight="700", fill=GREEN))
+    out.append(text(850, 715, "You can let go of SW2.", size=20, fill=MUTED))
+    out.append(rect(810, 750, 330, 62, fill=EMBER, rx=12))
+    out.append(text(975, 790, "Install June Local", size=22, weight="700", fill="#160a04", anchor="middle"))
+    out.append(rect(1170, 750, 170, 62, fill=BG2, rx=12))
+    out.append(text(1255, 790, "Back", size=22, fill=MUTED, anchor="middle"))
+    out.append(footer("Once it starts, the oven's fans spin up and stay fast while it works. That is normal."))
+    return svg_doc("".join(out))
+
+
+def make_progress():
+    out = [title_header("While the job runs", "Keep the oven connected and powered", mockup=True)]
+    out.append(text(130, 240, "Installing June Local", size=24, fill=MUTED))
+    out.append(text(130, 340, "42%", size=96, weight="300", fill=FG))
+    out.append(text(130, 400, "Writing to the oven · estimating", size=24, fill=EMBER2))
+    out.append(rect(130, 440, 1340, 26, fill="#23272e", rx=13))
+    out.append(rect(130, 440, 560, 26, fill=EMBER, rx=13))
+    out.append(text(130, 510, "3.2 of 7.8 GiB at 9.4 MB/s", size=22, fill=FG))
+    out.append(text(130, 545, "This can take about two minutes for an install; a backup or restore takes 15–30 minutes.", size=20, fill=MUTED))
+    out.append(rect(130, 600, 1340, 70, fill="#241417", stroke="#4a2226", rx=12))
+    out.append(text(170, 645, "Keep the oven connected and powered. Don't unplug anything.", size=23, fill="#ffb4b4"))
+    steps = ["Prepare", "Connect oven", "Write image", "Verify", "Finish"]
+    x = 200
+    for i, s in enumerate(steps):
+        color = GREEN if i < 2 else EMBER if i == 2 else "#3a3f47"
+        out.append(f'<circle cx="{x}" cy="730" r="14" fill="{color}"/>')
+        out.append(text(x + 22, 737, s, size=19, fill=FG if i <= 2 else MUTED))
+        x += 250
+    out.append(footer("The details panel shows the live installer log; the log is also saved to june-logs/ on the USB."))
+    return svg_doc("".join(out))
+
+
+def make_success():
+    out = [title_header("Job finished", "The next steps depend on the job", mockup=True)]
+    out.append(text(130, 250, "June Local is installed", size=52, weight="300", fill=GREEN))
+    out.append(text(130, 300, "Done · 2:14", size=22, fill=MUTED))
+    out.append(rect(130, 350, 1340, 16, fill=GREEN, rx=8))
+    steps = [
+        "Unplug the oven's power and the USB cable.",
+        "Wait 10 seconds, plug the power back in and let the oven start normally.",
+        "From a device on the same network, open http://<oven-ip>/local. You should see the June Local status page.",
+        "Pair from the June app or Home Assistant. Then close up the oven.",
+    ]
+    y = 430
+    for i, s in enumerate(steps):
+        out.append(f'<circle cx="{160}" cy="{y-6}" r="10" fill="{EMBER}"/>')
+        out.append(paragraph(190, y, s, width=86, size=22, fill=FG, lh=30))
+        y += 75
+    out.append(rect(130, 780, 260, 58, fill=EMBER, rx=12))
+    out.append(text(260, 818, "Done", size=22, weight="700", fill="#160a04", anchor="middle"))
+    out.append(footer("If you chose a custom CA, download the CA and companion app from the phone QR code before closing up."))
+    return svg_doc("".join(out))
+
+
+def make_backup_destination():
+    out = [title_header("Back up the oven · destination", "One 7.8 GB file; choose where it goes", mockup=True)]
+    out.append(wizard_steps(0, labels=("Drive", "Connect oven", "Back up")))
+    out.append(text(130, 310, "Where should the backup go?", size=42, weight="300", fill=FG))
+    out.append(paragraph(130, 360, "The backup is one 7.8 GB file. This computer runs from memory, so you can unplug the boot stick and use another drive.", width=88, size=22, lh=31))
+    rows = [
+        ("Ventoy (current boot USB)", "Boot USB", "exFAT · 12.4 GB free", GREEN),
+        ("BackupUSB", "USB", "exFAT · 28.1 GB free", EMBER2),
+    ]
+    y = 450
+    for name, tag, free, color in rows:
+        out.append(rect(130, y, 1340, 90, fill=PANEL, rx=14))
+        out.append(f'<circle cx="{170}" cy="{y+45}" r="12" fill="{color}"/>')
+        out.append(text(200, y + 52, name, size=25, fill=FG))
+        out.append(pill(1120, y + 22, tag, fill="#2a2e35", fg=color, size=14))
+        out.append(text(1430, y + 52, free, size=20, fill=MUTED, anchor="end"))
+        y += 110
+    out.append(rect(130, 690, 650, 70, fill=BG2, rx=12))
+    out.append(text(160, 733, "Folder (optional):  june-backups", size=21, fill=MUTED, font=MONO))
+    out.append(rect(810, 690, 660, 70, fill=BG2, rx=12))
+    out.append(text(840, 733, "File name:  261005-1430.img", size=21, fill=MUTED, font=MONO))
+    out.append(rect(130, 790, 330, 60, fill=EMBER, rx=12))
+    out.append(text(295, 828, "Next: connect the oven", size=21, weight="700", fill="#160a04", anchor="middle"))
+    out.append(footer("Leave at least 8 GB free. If the boot stick is full, swap in a second USB now — the live system is already in RAM."))
+    return svg_doc("".join(out))
+
+
+def qr_mock(x, y, size=180):
+    # A deterministic QR-like mockup; clearly labeled in the surrounding UI.
+    cells = 21
+    cell = size / cells
+    out = [rect(x, y, size, size, fill="#ffffff", stroke="#ffffff", rx=4)]
+    pattern = [
+        (0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (6, 0), (7, 0), (9, 0), (10, 0), (12, 0), (14, 0), (15, 0), (16, 0), (18, 0), (20, 0),
+        (0, 2), (2, 2), (4, 2), (6, 2), (8, 2), (10, 2), (12, 2), (14, 2), (16, 2), (18, 2), (20, 2),
+        (0, 4), (2, 4), (4, 4), (5, 4), (8, 4), (11, 4), (13, 4), (15, 4), (17, 4), (19, 4),
+        (0, 6), (1, 6), (3, 6), (5, 6), (7, 6), (9, 6), (11, 6), (13, 6), (15, 6), (17, 6), (19, 6),
+        (2, 8), (4, 8), (6, 8), (8, 8), (10, 8), (12, 8), (14, 8), (16, 8), (18, 8), (20, 8),
+        (0, 10), (1, 10), (3, 10), (5, 10), (7, 10), (9, 10), (11, 10), (13, 10), (15, 10), (17, 10), (19, 10),
+        (2, 12), (4, 12), (6, 12), (8, 12), (10, 12), (12, 12), (14, 12), (16, 12), (18, 12), (20, 12),
+        (0, 14), (1, 14), (3, 14), (5, 14), (7, 14), (9, 14), (11, 14), (13, 14), (15, 14), (17, 14), (19, 14),
+        (2, 16), (4, 16), (6, 16), (8, 16), (10, 16), (12, 16), (14, 16), (16, 16), (18, 16), (20, 16),
+        (0, 18), (1, 18), (3, 18), (5, 18), (7, 18), (9, 18), (11, 18), (13, 18), (15, 18), (17, 18), (19, 18),
+        (2, 20), (4, 20), (6, 20), (8, 20), (10, 20), (12, 20), (14, 20), (16, 20), (18, 20), (20, 20),
+    ]
+    for cx, cy in pattern:
+        out.append(f'<rect x="{x + cx * cell}" y="{y + cy * cell}" width="{cell - 0.6}" height="{cell - 0.6}" fill="#050607"/>')
+    return "".join(out)
+
+
+def make_phone_access():
+    out = [title_header("Connect a phone", "The phone shows the same screens and can run the jobs", mockup=True)]
+    out.append(text(130, 300, "Connect a phone", size=44, weight="300", fill=FG))
+    out.append(paragraph(130, 350, "Your phone shows the same screens and can start and follow jobs, and it can download the companion app. It has to be on the same network as this computer.", width=54, size=22, lh=31))
+    out.append(rect(130, 500, 640, 300, fill=PANEL, rx=16))
+    out.append(qr_mock(180, 545, 200))
+    out.append(text(420, 610, "Scan with your phone's camera", size=22, fill=MUTED))
+    out.append(text(420, 655, "http://192.168.1.50/", size=22, fill=EMBER2, font=MONO))
+    out.append(rect(810, 500, 660, 300, fill=PANEL, rx=16))
+    out.append(text(850, 555, "Allow a phone on this network", size=25, weight="700", fill=FG))
+    out.append(paragraph(850, 595, "Anyone who scans the code can control the installer. Turning it off disconnects phones and makes a new code.", width=60, size=20, lh=28))
+    out.append(rect(850, 700, 100, 46, fill=GREEN, rx=23))
+    out.append(f'<circle cx="927" cy="723" r="18" fill="#0b0d10"/>')
+    out.append(text(970, 730, "On · 1 phone connected", size=20, fill=MUTED))
+    out.append(footer("Use the phone UI to take real screenshots of the home, destination, progress and success screens."))
+    return svg_doc("".join(out))
+
+
+def make_text_mode():
+    out = [title_header("Basic text UI", "Fallback when the graphical interface cannot start", mockup=True)]
+    out.append(terminal(130, 200, 1340, 560, [
+        "June Local installer",
+        "",
+        "  1) Install June Local",
+        "  2) Install with your own CA",
+        "  3) Back up the oven",
+        "  4) Restore a backup",
+        "  5) Exit installer and reboot",
+        "",
+        "Select an option [1-5]: _",
+        "",
+        "# Same jobs as the graphical UI.",
+        "# Arrow keys / number keys + Enter.",
+        "# Logs still go to june-logs/ on the USB.",
+    ]))
+    out.append(card(130, 790, 1340, 60, None, None, accent=EMBER))
+    out.append(text(170, 830, "Use this only if the graphical UI fails. The graphical installer is the normal path.", size=22, fill=MUTED))
+    return svg_doc("".join(out))
+
+
+def make_basic_vs_custom():
+    out = [title_header("Basic vs custom install", "Pick the recommended path unless you need a per-home CA")]
+    out.append(card(90, 200, 680, 420, "Install June Local", "Keeps June's certificate and the factory app. The quickest way. The June app and Home Assistant pair normally; no CA install on the phone.", accent=EMBER, title_size=30, pad=26))
+    out.append(card(830, 200, 680, 420, "Install with your own CA", "Advanced. Creates a private certificate authority on the USB, signs a certificate for the oven's address, and gives you a CA file to install on the phone. Use it if you want a per-home CA.", accent=EMBER2, title_size=30, pad=26))
+    out.append(rect(90, 660, 1420, 120, fill=PANEL, rx=16))
+    out.append(text(130, 710, "Persistence option", size=26, weight="700", fill=FG))
+    out.append(text(130, 750, "Off by default. Turn it on only if you want the no-pin patch to survive a factory reset; it stores the patched app in /system.", size=20, fill=MUTED))
+    out.append(footer("Most users should choose the recommended basic install."))
+    return svg_doc("".join(out))
+
+
+def make_safety_checklist():
+    out = [title_header("Before you press the final button", "A short safety checklist")]
+    dos = [
+        "Use a USB 3 port on the computer itself, not a hub.",
+        "Keep the oven powered and connected for the whole job.",
+        "Wait for the success screen before unplugging anything.",
+        "Let the oven fans spin fast; that is normal.",
+        "Copy the logs from june-logs/ if you need support.",
+    ]
+    donts = [
+        "Do not unplug the oven during an install or restore.",
+        "Do not use FAT32 for the backup drive.",
+        "Do not rename the Ventoy partition.",
+        "Do not close up the oven before testing it.",
+        "Do not power off the laptop while the job is running.",
+    ]
+    out.append(card(90, 200, 680, 520, "Do", None, accent=GREEN, title_size=32, pad=26))
+    y = 300
+    for item in dos:
+        out.append(bullet(130, y, item, width=48, size=21, fill=FG, color=GREEN))
+        y += 74
+    out.append(card(830, 200, 680, 520, "Don't", None, accent=RED, title_size=32, pad=26))
+    y = 300
+    for item in donts:
+        out.append(bullet(870, y, item, width=48, size=21, fill=FG, color=RED))
+        y += 74
+    out.append(footer("The installer warns before every destructive step. Nothing changes until you press the final button."))
+    return svg_doc("".join(out))
+
+
 def main() -> int:
     if shutil.which("rsvg-convert") is None:
         print("rsvg-convert not found; install librsvg2-bin or render the SVGs elsewhere", file=sys.stderr)
@@ -446,6 +689,15 @@ def main() -> int:
         "08-backup-and-swap": make_backup_swap(),
         "09-installer-ui": make_installer_ui(),
         "10-troubleshooting": make_troubleshooting(),
+        "11-install-options": make_install_options(),
+        "12-connect-oven": make_connect_oven(),
+        "13-progress": make_progress(),
+        "14-success": make_success(),
+        "15-backup-destination": make_backup_destination(),
+        "16-phone-access": make_phone_access(),
+        "17-text-mode": make_text_mode(),
+        "18-basic-vs-custom": make_basic_vs_custom(),
+        "19-safety-checklist": make_safety_checklist(),
     }
     for name, doc in assets.items():
         svg_path = SVG_DIR / f"{name}.svg"

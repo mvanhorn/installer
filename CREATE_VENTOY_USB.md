@@ -199,3 +199,8 @@ folder if it does not exist):
 - Show the current release's ISO SHA256 and tell users to verify it.
 - Warn that installing Ventoy erases the USB, and that the installer modifies
   the oven's eMMC.
+
+## Next
+
+For what the live installer looks like and how to use each job, see
+[`USE_LIVE_INSTALLER.md`](USE_LIVE_INSTALLER.md).

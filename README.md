@@ -35,6 +35,8 @@ The camera/live-view/interior-light architecture is summarized in
 [`CAMERA.md`](CAMERA.md).
 The end-user USB recipe (Ventoy, Secure Boot, backup/log/cert layout) is in
 [`CREATE_VENTOY_USB.md`](CREATE_VENTOY_USB.md).
+The live installer walkthrough (basic/custom install, backup, restore, phone
+UI, text mode) is in [`USE_LIVE_INSTALLER.md`](USE_LIVE_INSTALLER.md).
 Website tutorial screenshots and mockups are in [`website-assets/`](website-assets/)
 (SVG source, 1920 px PNGs, and an `index.html` preview).
 
