@@ -34,6 +34,7 @@ chmod +x config/includes.chroot/usr/local/bin/june-kiosk
 # june-kiosk to wake the pointer cursor after cage starts.
 meson setup /build/wlrctl-build /build/vendor/wlrctl -Dman-pages=disabled >/dev/null
 ninja -C /build/wlrctl-build >/dev/null
+mkdir -p config/includes.chroot/usr/bin
 install -m 0755 /build/wlrctl-build/wlrctl config/includes.chroot/usr/bin/wlrctl
 
 # Extra runtime packages for the live system (menu UI + deploy dependencies,
