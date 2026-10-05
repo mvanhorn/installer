@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>June Local website assets</title>
+<style>
+  :root { color-scheme: dark; --bg:#08090b; --panel:#14171c; --fg:#f4f4f5; --muted:#a1a1aa; --ember:#ff7a2e; --line:#2a2e35; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; }
+  main { max-width:1200px; margin:0 auto; padding:40px 24px 80px; }
+  h1 { font-size:40px; margin:0 0 8px; }
+  p.lead { color:var(--muted); font-size:18px; margin:0 0 36px; }
+  figure { margin:0 0 44px; background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  img { display:block; width:100%; height:auto; }
+  figcaption { padding:16px 20px 20px; color:var(--muted); font-size:16px; line-height:1.45; }
+  figcaption b { color:var(--fg); }
+</style>
+</head>
+<body><main>
+<h1>June Local website assets</h1>
+<p class="lead">Preview of the SVG/PNG pack. Screens marked MOCKUP are reconstructions, not photographs.</p>
+
+<figure><img src="png/01-overview-flow.png" alt="Overview flow: download, create the stick, copy the files, boot, install or back up"><figcaption><b>01 — Overview flow.</b> Hero or top-of-page summary.</figcaption></figure>
+<figure><img src="png/02-ventoy-windows.png" alt="Ventoy2Disk Windows mockup with MBR and Install"><figcaption><b>02 — Windows Ventoy step.</b> Mockup: device, MBR, Secure Boot option, Install; result is VTOYEFI + exFAT Ventoy.</figcaption></figure>
+<figure><img src="png/03-ventoy-linux.png" alt="Linux terminal mockup for Ventoy installation"><figcaption><b>03 — Linux Ventoy step.</b> Mockup: install dosfstools/exfatprogs, identify the disk, run Ventoy2Disk.sh.</figcaption></figure>
+<figure><img src="png/04-usb-layout.png" alt="USB layout: VTOYEFI and Ventoy exFAT partitions, ISO, config, logs, certs, free space"><figcaption><b>04 — What is on the stick.</b> Partition and file layout, including the ~8 GB backup space.</figcaption></figure>
+<figure><img src="png/05-copy-and-config.png" alt="Copy the ISO and create ventoy/ventoy.json"><figcaption><b>05 — Copy the ISO and config.</b> Root of the Ventoy partition plus the recommended ventoy.json.</figcaption></figure>
+<figure><img src="png/06-boot-menus.png" alt="Ventoy and June Local boot menus"><figcaption><b>06 — The two boot menus.</b> Ventoy first, June Local graphical/text second.</figcaption></figure>
+<figure><img src="png/07-secure-boot.png" alt="Secure Boot and MokManager steps"><figcaption><b>07 — Secure Boot.</b> Enroll Ventoy’s key or disable Secure Boot for the install.</figcaption></figure>
+<figure><img src="png/08-backup-and-swap.png" alt="Live RAM system and backup USB swap"><figcaption><b>08 — Backups and the RAM system.</b> Keep the Ventoy stick or swap in a second USB; logs, certs, and backup sizes.</figcaption></figure>
+<figure><img src="png/09-installer-ui.png" alt="June Local installer home screen mockup"><figcaption><b>09 — Installer UI preview.</b> Faithful mockup of the real home screen; replace with phone-UI screenshots when available.</figcaption></figure>
+<figure><img src="png/10-troubleshooting.png" alt="Troubleshooting quick cards"><figcaption><b>10 — Troubleshooting.</b> The common Ventoy/USB/backup problems and fixes.</figcaption></figure>
+
+</main></body>
+</html>
