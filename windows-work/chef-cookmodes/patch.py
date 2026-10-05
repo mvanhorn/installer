@@ -78,6 +78,17 @@ def patch_validator(decoded):
 
     if-nez v0, :unsupported
 
+    # slow_cook plans carry 0-duration placeholder steps until the UI's
+    # duration screen fills them; starting one remotely reboots the oven.
+    # Block it until the 11002 duration_ms extension lands.
+    const-string v0, "slow_cook"
+
+    invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    if-nez v0, :unsupported
+
     sget-object v0, Lcom/junelife/device/chef/ui/cv/CookPrograms;->PRIMITIVE_PROGRAM_MAP:Ljava/util/HashMap;
 
     invoke-virtual {v0, p0}, Ljava/util/HashMap;->containsKey(Ljava/lang/Object;)Z

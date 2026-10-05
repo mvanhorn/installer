@@ -59,12 +59,15 @@ Current build:
 
 ```
 Chef_cookmodes_signed.apk
-sha256 c3825ab018c09c5d63b076afc65afb4774bf13d4a579c6c01cccc96dd65e1475
+sha256 8a006b806b732b6d426a396068b3a1aa039c9a3793056a3482d56a78282d6fb9
 ```
 
-The two earlier builds (64edf1e4, then 6a1b2bc9) shipped inverted smali
-branches and were rejected live by Chef ("invalid food name" for bake); the
-c3825ab0 build is the first with both branches verified by re-decoding the APK.
+Build history: 64edf1e4 and 6a1b2bc9 had inverted smali branches and were
+rejected live by Chef (`invalid food name` for bake). c3825ab0 fixed both
+branches and passed bake/toast/reheat/proof/warm/dehydrate/broil live, but
+remote `slow_cook` rebooted the oven because its plans carry 0-duration
+placeholder steps until the UI sets a duration. 8a006b80 blocks `slow_cook`
+cleanly (`not-allowed`) until the 11002 `duration_ms` extension lands in 0.6.
 
 ## Deploy
 
