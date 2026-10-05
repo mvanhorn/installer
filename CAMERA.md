@@ -93,8 +93,8 @@ so a UI level must be converted before it is sent as a doneness target.
   - `d08a4b4` installer: keep june.local as the default oven name
   - `6eef2f9` camera: phone MJPEG view and interior-light bridge
   - `36f2df9` installer: include the source-built light bridge APK
-- Latest stick image: build `20261004-2345-f72dc53e`, ISO sha256
-  `1480efaf123029420efc39d9663ae19f90fe4faaf97a0b9a3c7db8718083a9ac`.
+- Latest stick image: build `20261005-0014-f72dc53e`, ISO sha256
+  `57627512f431d14f93927074872a9ded33beb85d0444e598d8257afa1b59cc66`.
 - Not yet exercised on physical hardware (oven offline at build time). A
   reinstall is required to deploy the new `june-camerad`, `june-local`, boot
   image, and `JuneLight` helper.
