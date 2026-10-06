@@ -56,7 +56,7 @@
     new-instance v0, Lcom/july/oven/LightConnection;
     invoke-direct/range {v0 .. v6}, Lcom/july/oven/LightConnection;-><init>(Lcom/july/oven/LightBridgeService;Ljava/lang/String;ZIII)V
 
-    const-string v2, "com.junelife.device.cookmanager"
+    const-string v2, "com.junelife.device.cookmanager.service"
     const-string v3, "com.junelife.device.cookmanager.service.AxonService"
     new-instance v8, Landroid/content/ComponentName;
     invoke-direct {v8, v2, v3}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V
