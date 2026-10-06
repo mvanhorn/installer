@@ -8,12 +8,16 @@
 
 GO ?= go
 GOENV = CGO_ENABLED=0
+VERSION ?= 0.5
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS = -s -w -X main.appVersion=$(VERSION) -X main.appCommit=$(COMMIT) -X main.appBuild=$(BUILD_DATE)
 
 .PHONY: oven camerad docker test clean
 
 oven:
 	mkdir -p bin
-	GOOS=linux GOARCH=arm GOARM=7 $(GOENV) $(GO) build -trimpath -ldflags "-s -w" -o bin/june-local-linux-armv7 .
+	GOOS=linux GOARCH=arm GOARM=7 $(GOENV) $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/june-local-linux-armv7 .
 
 camerad:
 	mkdir -p bin
@@ -21,7 +25,7 @@ camerad:
 
 docker:
 	mkdir -p bin
-	GOOS=linux GOARCH=amd64 $(GOENV) $(GO) build -trimpath -ldflags "-s -w" -o bin/june-local-linux-amd64 .
+	GOOS=linux GOARCH=amd64 $(GOENV) $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/june-local-linux-amd64 .
 
 test:
 	$(GO) test ./...

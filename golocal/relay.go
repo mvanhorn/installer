@@ -148,6 +148,9 @@ func relay(hub *Hub, peer *Peer, raw []byte) {
 	hub.mu.Lock()
 	hub.framesSeen++
 	hub.mu.Unlock()
+	if peer.role == "oven" {
+		lastOvenFrameNano.Store(time.Now().UnixNano())
+	}
 
 	logLine("[%s->%s] %s", peer.role, counterRole(peer.role), desc)
 	writeJSONL(map[string]any{"dir": peer.role, "path": peer.path, "raw": string(raw)})
@@ -187,11 +190,28 @@ func relay(hub *Hub, peer *Peer, raw []byte) {
 				}
 			case 10017:
 				cameraEnabledFlag.Store(false)
+			case 10020:
+				if data != nil {
+					order, _ := data["request_order"].(float64)
+					status, _ := data["status"].(string)
+					noteAck(int64(order), status)
+				}
 			case 10026:
 				capturePairingFromOven(hub, data)
 			}
 		} else {
 			if dev, _ := obj["device_id"].(string); dev != "" {
+				noteClientSeen(dev)
+				ccode, _ := obj["message_code"].(float64)
+				corder, _ := obj["order"].(float64)
+				cmode := ""
+				if cdata, _ := obj["data"].(map[string]any); cdata != nil {
+					cmode, _ = cdata["primitive_type"].(string)
+				}
+				switch int64(ccode) {
+				case 11001, 11002, 11004, 11005, 11006, 11007, 11009, 11010, 11013, 11015, 11016:
+					noteCommand(int(ccode), int64(corder), dev, cmode)
+				}
 				hub.mu.Lock()
 				if _, exists := hub.companionsInfo[dev]; !exists {
 					name, _ := obj["device_name"].(string)

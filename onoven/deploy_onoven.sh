@@ -162,6 +162,7 @@ install_system_files() {
   if [ -n "$CA_SRC" ] && [ -n "$CA_HASH" ]; then
     mkdir -p "$mnt/etc/security/cacerts"
     install -m 0644 "$CA_SRC" "$mnt/etc/security/cacerts/$CA_HASH.0"
+    install -m 0644 "$CA_SRC" "$mnt/etc/june_ca.crt"
   fi
   install -m 0755 "$BOOTCLEAR_SRC" "$mnt/bin/june_bootclear.sh"
   # june_reaper.sh is the stock boot script that mounts the encrypted
@@ -452,6 +453,52 @@ else
   install -m 0644 "$COMPANION_STATE_SRC" "$UDA_MNT/june/companions_state.json"
   echo "[+] seeded companion registry from payload"
 fi
+
+# Provenance for the status page and support: what was installed, how, and
+# the expected hashes of the components june-local reports on.
+comp_sha() {
+  [ -n "${1:-}" ] && [ -f "$1" ] && sha256sum "$1" | awk '{print $1}' || true
+}
+case "$(basename "$JCM_SRC")" in
+  JuneCloudMessaging_nopin_signed.apk) jcm_sha="$(comp_sha "$JCM_SRC")" ;;
+  *) jcm_sha="" ;;
+esac
+install_mode="basic"
+ca_mode="project"
+if [ -n "$CA_SRC" ]; then
+  install_mode="custom"
+  ca_mode="per-home"
+fi
+persist="off"
+[ "$JCM_PERSIST" = "1" ] && persist="on"
+installer_version="${JUNE_VERSION:-$(cat "$SRC_DIR/VERSION" 2>/dev/null || echo 0.5)}"
+build_id="${JUNE_BUILD_ID:-$(cat "$SRC_DIR/BUILD_ID" 2>/dev/null || echo unknown)}"
+install_ip="${JUNE_OVEN_IP:-}"
+cat > "$UDA_MNT/june/install.json" <<EOF
+{
+  "mode": "$install_mode",
+  "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "installer_version": "$installer_version",
+  "build_id": "$build_id",
+  "persistence": "$persist",
+  "ca_mode": "$ca_mode",
+  "hostname": "${hostname_value:-june}",
+  "install_ip": "$install_ip",
+  "components": {
+    "june-local": "$(comp_sha "$BIN_SRC")",
+    "june-camerad": "$(comp_sha "$CAMERAD_SRC")",
+    "OvenLight": "$(comp_sha "$LIGHT_SRC")",
+    "Chef": "$(comp_sha "$CHEF_SRC")",
+    "JuneCloudMessaging": "$jcm_sha",
+    "Remotes": "$(comp_sha "$REMOTES_SRC")",
+    "MediaCapturer": "$(comp_sha "$MEDIACAPTURER_SRC")",
+    "Analytics": "$(comp_sha "$ANALYTICS_SRC")"
+  }
+}
+EOF
+chmod 0644 "$UDA_MNT/june/install.json"
+echo "[+] wrote /data/june/install.json ($install_mode, persistence $persist)"
+
 case "$(basename "$JCM_SRC")" in
   JuneCloudMessaging_nopin_signed.apk)
     if [ "$JCM_PERSIST" = "1" ]; then

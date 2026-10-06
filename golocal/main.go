@@ -19,6 +19,7 @@ import (
 type Config struct {
 	Cert            string
 	Key             string
+	CA              string
 	Port            int
 	HTTPPort        int
 	Bind            string
@@ -105,6 +106,7 @@ func main() {
 	if dir := filepath.Dir(cfg.LogPath); dir != "" {
 		_ = os.MkdirAll(dir, 0o755)
 	}
+	logLine("[init] June Local %s (%s, %s)", appVersion, appCommit, appBuild)
 	logLine("[init] run tag=%q log=%q jsonl=%q", runTag, logPath, jsonlPath)
 	writeJSONL(map[string]any{"event": "run-start", "log": cfg.LogPath, "jsonl": cfg.JsonlPath})
 	initInteriorLight()
@@ -145,6 +147,7 @@ func main() {
 	if cfg.OvenID != "" {
 		hub.setOvenID(cfg.OvenID)
 	}
+	startStatusRefresher(hub, cfg)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		handleRoot(hub, cfg, w, r)
@@ -204,6 +207,7 @@ func parseFlags() *Config {
 	cfg := &Config{}
 	flag.StringVar(&cfg.Cert, "cert", "certs/junelife_chain_godaddy_intermediate.crt", "TLS cert chain")
 	flag.StringVar(&cfg.Key, "key", "certs/june-local.key", "TLS private key")
+	flag.StringVar(&cfg.CA, "ca", "/system/etc/june_ca.crt", "CA certificate file for /local/ca.crt (optional)")
 	flag.IntVar(&cfg.Port, "port", 443, "TLS listen port")
 	flag.IntVar(&cfg.HTTPPort, "http-port", 80, "plaintext listen port (0 = disabled)")
 	flag.StringVar(&cfg.Bind, "bind", "0.0.0.0", "bind address")

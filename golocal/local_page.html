@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>June Local {{VERSION}}</title>
+<style>
+:root{--bg:#07090d;--card:#11161f;--line:#222b3a;--text:#e6edf7;--dim:#8fa0b8;--ok:#34d399;--amber:#fbbf24;--red:#f87171;--accent:#38bdf8}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,#152035,var(--bg));color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:880px;margin:0 auto;padding:28px 18px 60px}
+header{display:flex;gap:14px;align-items:center;margin-bottom:22px}
+.dot{width:16px;height:16px;border-radius:50%;background:var(--ok);box-shadow:0 0 12px var(--ok);flex:none}
+.dot.amber{background:var(--amber);box-shadow:0 0 12px var(--amber)}
+.dot.red{background:var(--red);box-shadow:0 0 12px var(--red)}
+h1{font-size:24px;margin:0}
+.sub{color:var(--dim);margin:2px 0 0;font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+.tile{background:linear-gradient(180deg,#141b26,#0f141d);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.tile .k{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.tile .v{font-size:19px;font-weight:650;margin-top:4px}
+.tile .s{color:var(--dim);font-size:12px;margin-top:2px}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 14px;margin:10px 0}
+summary{cursor:pointer;padding:12px 2px;font-weight:600;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary:after{content:"▾";float:right;color:var(--dim)}
+details[open] summary:after{content:"▴"}
+.body{padding:2px 2px 14px;color:var(--dim)}
+.row{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px dashed #1c2431}
+.row:last-child{border-bottom:none}
+.row b{color:var(--text);font-weight:600}
+.ok{color:var(--ok)}.amber{color:var(--amber)}.red{color:var(--red)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.prob{border-left:3px solid var(--amber);background:#1a1608;padding:10px 12px;border-radius:8px;margin:8px 0;color:var(--text)}
+.prob.red{border-color:var(--red);background:#1c0f10}
+.prob .fix{color:var(--dim);font-size:13px;margin-top:4px}
+footer{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:26px;color:var(--dim);font-size:13px}
+footer a{color:var(--accent);text-decoration:none}
+button{background:#13202f;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+noscript{display:block;background:#1a1608;border:1px solid #4a3b12;padding:12px;border-radius:10px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="dot {{HEADLINE_CLASS}}" id="dot"></div>
+  <div><h1 id="headline">{{HEADLINE}}</h1><p class="sub" id="subline">June Local {{VERSION}}</p></div>
+</header>
+<noscript>
+  <p><b>June Local {{VERSION}}</b>. JavaScript is off, so this page shows a summary only.
+  <a href="/local/status">Open the status JSON</a> or <a href="/local/ca.crt">download the CA</a>.</p>
+</noscript>
+<section class="tiles" id="tiles"></section>
+<section id="problems"></section>
+<section id="sections"></section>
+<footer>
+  <button id="copy">Copy diagnostics</button>
+  <a href="/local/ca.crt">CA certificate</a>
+  <a href="https://github.com/prj-july/installer/releases/tag/{{VERSION}}">Release notes</a>
+  <a href="https://project-july.org/setup">Setup guide</a>
+  <a href="https://github.com/prj-july/installer">Repository</a>
+  <a href="https://github.com/prj-july/installer/issues/new">Report a problem</a>
+</footer>
+</main>
+<script id="initial-status" type="application/json">{{JSON}}</script>
+<script>
+const initial = JSON.parse(document.getElementById('initial-status').textContent);
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const secs = s => s < 0 ? 'never' : (s < 60 ? s + ' s ago' : (s < 3600 ? Math.round(s/60) + ' min ago' : Math.round(s/3600) + ' h ago'));
+const bytes = n => n > 1e9 ? (n/1e9).toFixed(1)+' GB' : (n > 1e6 ? (n/1e6).toFixed(1)+' MB' : (n > 1e3 ? (n/1e3).toFixed(0)+' KB' : (n||0)+' B'));
+let data = initial;
+
+function tile(k, v, s, cls) { return `<div class="tile"><div class="k">${esc(k)}</div><div class="v ${cls||''}">${esc(v)}</div><div class="s">${esc(s)}</div></div>`; }
+function row(k, v, cls) { return `<div class="row"><span>${esc(k)}</span><b class="${cls||''}">${esc(v)}</b></div>`; }
+function details(id, title, body, open) { return `<details id="${id}" ${open?'open':''}><summary>${esc(title)}</summary><div class="body">${body}</div></details>`; }
+
+function render(d) {
+  const worst = (d.problems || []).find(p => p.severity === 'red') || (d.problems || []).find(p => p.severity === 'amber');
+  const sev = worst ? worst.severity : 'ok';
+  $('dot').className = 'dot ' + (sev === 'ok' ? '' : sev);
+  $('headline').textContent = worst ? worst.title : 'All good';
+  $('subline').textContent = `June Local ${d.version.version} · ${d.version.commit} · up ${Math.round(d.version.uptime_seconds/3600)} h`;
+  $('tiles').innerHTML =
+    tile('Oven', d.oven.connection === 'connected' ? 'Connected' : 'Offline', `last message ${secs(d.oven.last_frame_age_seconds)}`, d.oven.connection === 'connected' ? 'ok' : 'red') +
+    tile('Cooking', d.cook.state === 'idle' ? 'Idle' : (d.cook.mode || 'Cooking'), d.cook.target_c ? `${d.cook.target_c.toFixed(0)} °C target` : 'no active plan') +
+    tile('Camera', d.camera.camerad_running ? 'Running' : 'Down', `last frame ${secs(d.camera.last_frame_age_seconds)}`, d.camera.last_frame_age_seconds > 20 ? 'amber' : 'ok') +
+    tile('Version', d.version.version, `${d.version.commit} · ${d.version.build_date}`);
+
+  $('problems').innerHTML = (d.problems || []).map(p => `<div class="prob ${p.severity}"><b>${esc(p.title)}</b><div>${esc(p.detail)}</div><div class="fix">${esc(p.fix)}</div></div>`).join('');
+
+  const comps = (d.install.components || []).map(c => row(`${c.ok ? '✓' : '✗'} ${c.name}`, c.expected ? (c.actual ? c.actual.slice(0,8) + (c.expected === c.actual ? '' : ' ≠ ' + c.expected.slice(0,8)) : 'unread') : (c.actual ? c.actual.slice(0,8) : ''), c.ok ? 'ok' : 'amber')).join('');
+  const clients = (d.clients.items || []).map(c => row(`${c.name} (${c.platform || 'client'})`, `${c.paired ? 'paired' : 'unpaired'} · ${c.connected ? 'connected' : 'idle'} · ${secs(c.last_seen_seconds)}`, c.paired ? 'ok' : 'amber')).join('') || '<p>No paired clients.</p>';
+  const cert = row('Subject', d.cert.subject) + row('SANs', (d.cert.sans||[]).join(', ')) + row('Issuer', d.cert.issuer) +
+    row('Valid until', `${d.cert.not_after} (${d.cert.days_remaining} days)`, d.cert.days_remaining < 30 ? 'amber' : 'ok') +
+    row('Fingerprint', d.cert.fingerprint ? d.cert.fingerprint.slice(0,16) : '') +
+    row('CA fingerprint', d.cert.ca_fingerprint ? d.cert.ca_fingerprint.slice(0,16) : '') +
+    row('CA in system store', d.cert.ca_in_system_store ? 'yes' : 'no', d.cert.ca_in_system_store ? 'ok' : 'amber') +
+    row('Covers current IP', d.cert.san_covers_current_ip ? 'yes' : 'no', d.cert.san_covers_current_ip ? 'ok' : 'amber') +
+    `<p><a href="/local/ca.crt">Download CA / chain</a> — check the fingerprint matches the one shown by the installer.</p>`;
+  const net = row('IP', (d.network.ips||[]).join(', ')) + row('Hostname', d.network.mdns || d.network.hostname) +
+    row('Ports', `TLS ${d.network.tls_port} · HTTP ${d.network.http_port}`) + row('Hosts override', d.network.hosts_overrides ? 'yes' : 'no') +
+    row('HA client', d.network.ha_client_version || 'not seen') + row('Gateway', d.network.gateway || '') + row('DNS', (d.network.dns||[]).join(', '));
+  const storage = row('Data free', d.storage.data_free_pct.toFixed(1) + '%', d.storage.data_free_pct < 10 ? 'amber' : 'ok') +
+    row('Collector free', d.storage.collector_free_pct.toFixed(1) + '%', d.storage.collector_free_pct < 10 ? 'amber' : 'ok') +
+    row('Log', bytes(d.storage.log_bytes)) + row('JSONL', bytes(d.storage.jsonl_bytes)) + row('Media', bytes(d.storage.media_bytes)) + row('Latest frame', bytes(d.storage.latest_frame_bytes));
+  const provenance = row('Install', `${d.install.mode || 'unknown'} · ${d.install.date || ''}`) + row('Installer', d.install.installer_version || '') +
+    row('Build ID', d.install.build_id || '') + row('Persistence', d.install.persistence || '') + row('CA mode', d.install.ca_mode || '') +
+    row('Hostname', d.install.hostname || '') + row('Install IP', d.install.install_ip || '') + row('Presets', `${d.presets.catalog_entries} entries · ${bytes(d.presets.upstream_bytes)}`);
+  const cam = row('june-camerad', d.camera.camerad_running ? 'running' : 'stopped', d.camera.camerad_running ? 'ok' : 'red') +
+    row('Stock socket', d.camera.stock_socket ? 'present' : 'missing', d.camera.stock_socket ? 'ok' : 'amber') + row('Viewer gate', d.camera.viewer_gate ? 'open' : 'closed') +
+    row('Last frame', secs(d.camera.last_frame_age_seconds)) + row('Light helper', d.light.helper_installed ? 'installed' : 'missing', d.light.helper_installed ? 'ok' : 'amber') +
+    row('Light scene', d.light.scene_on ? 'on' : 'off') + row('Last light result', d.light.last_result || 'none');
+  $('sections').innerHTML = details('sec-install','Install & components',comps + row('Summary', `${(d.install.components||[]).filter(c=>c.ok).length}/${(d.install.components||[]).length} components ok`)) +
+    details('sec-clients','Clients & pairing',clients) +
+    details('sec-camera','Camera & light',cam) +
+    details('sec-cert','Certificate',cert) +
+    details('sec-network','Network',net) +
+    details('sec-storage','Storage',storage) +
+    details('sec-provenance','Provenance',provenance) +
+    details('sec-errors','Recent errors',(d.errors||[]).map(e=>row(e.time, `${e.source}: ${e.message}`)).join('') || '<p>None.</p>');
+
+  const open = {}; (d.problems||[]).forEach(p => { const m = { 'oven-disconnected':'sec-network','factory-fallback':'sec-install','camera-bridge':'sec-camera','light-bridge':'sec-camera','cert-expiry':'sec-cert','cert-ip-mismatch':'sec-cert','storage-low':'sec-storage' }; if (m[p.id]) open[m[p.id]] = 1; });
+  Object.keys(open).forEach(id => { const el = $(id); if (el) el.open = true; });
+}
+
+function refresh() { fetch('/local/status', {cache:'no-store'}).then(r=>r.json()).then(j=>{data=j;render(j);}).catch(()=>{}); }
+$('copy').addEventListener('click', () => {
+  const txt = '```json\n' + JSON.stringify(data, null, 2) + '\n```';
+  navigator.clipboard.writeText(txt).then(()=>{$('copy').textContent='Copied';setTimeout(()=>$('copy').textContent='Copy diagnostics',1500);});
+});
+render(initial);
+setInterval(()=>{ if(!document.hidden) refresh(); }, 7000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refresh(); });
+</script>
+</body>
+</html>

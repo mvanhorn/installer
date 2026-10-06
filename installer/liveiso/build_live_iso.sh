@@ -11,11 +11,13 @@ fi
 
 # Bake a build id into the image so the running installer can tell the user
 # exactly which build they booted (this prevents stale-USB confusion).
-BUILD_ID="$(date +%Y%m%d-%H%M)-$( (cat build.sh prepare_assets.sh gui/server.py gui/web/*.html gui/web/*.css gui/web/*.js 2>/dev/null || true; sha256sum assets/Chef_cookmodes_signed.apk 2>/dev/null || true) | sha256sum | cut -c1-8)"
 # Release version from the nearest v* tag: "v0.5" on the tagged commit,
 # "v0.5-3-g9a0350c" for later test builds, "-dirty" with uncommitted changes.
-# JUNE_VERSION overrides it.
-VERSION="${JUNE_VERSION:-$(git describe --tags --match 'v[0-9]*' --dirty 2>/dev/null || echo dev)}"
+# Tags may be v0.5 or 0.5; strip the leading v for display. JUNE_VERSION
+# overrides the tag.
+VERSION="${JUNE_VERSION:-$(git describe --tags --match 'v[0-9]*' --match '[0-9]*' --dirty 2>/dev/null || echo 0.5)}"
+VERSION="${VERSION#v}"
+BUILD_ID="$(date +%Y%m%d-%H%M)-$( (cat build.sh prepare_assets.sh gui/server.py gui/web/*.html gui/web/*.css gui/web/*.js 2>/dev/null || true; printf '%s' "$VERSION"; sha256sum assets/Chef_cookmodes_signed.apk 2>/dev/null || true) | sha256sum | cut -c1-8)"
 if [ -d assets ]; then
   printf '%s\n' "$BUILD_ID" > assets/BUILD_ID
   printf '%s\n' "$VERSION" > assets/VERSION

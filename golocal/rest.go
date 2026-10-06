@@ -45,6 +45,7 @@ func handleREST(hub *Hub, cfg *Config, w http.ResponseWriter, r *http.Request) {
 	quietPoll := r.Method == "GET" && path == "/internal/camera-bridge-enabled"
 
 	if !quietPoll {
+		noteHAUserAgent(r.UserAgent())
 		logLine("[rest] %s %s ua=%s", r.Method, path, r.UserAgent())
 		if mediaUpload {
 			logLine("[rest]   body: <%d bytes binary>", len(bodyBytes))
@@ -72,24 +73,15 @@ func handleREST(hub *Hub, cfg *Config, w http.ResponseWriter, r *http.Request) {
 
 	// Human/phone-friendly local-mode verification.
 	if r.Method == "GET" && path == "/local/status" {
-		writeJSON(w, 200, map[string]any{
-			"success": true,
-			"ok":      true,
-			"mode":    "local",
-			"server":  "june-local",
-			"version": "local",
-		})
+		handleLocalStatus(hub, cfg, w, r)
 		return
 	}
 	if r.Method == "GET" && path == "/local" {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = fmt.Fprintf(w, `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>June Local</title></head><body style="font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
-<main style="text-align:center;max-width:28em"><h1 style="color:#22c55e">June Local is running</h1>
-<p>This oven is using the local on-oven server instead of the June cloud.</p>
-<p><a style="color:#38bdf8" href="/media/view">Open the live oven camera</a></p>
-<p><code>https://api.junelife.com/local/status</code><br><code>http://oven-ip/local/status</code></p></main></body></html>`)
+		handleLocalPage(hub, cfg, w, r)
+		return
+	}
+	if r.Method == "GET" && path == "/local/ca.crt" {
+		handleLocalCA(cfg, w, r)
 		return
 	}
 

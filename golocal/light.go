@@ -50,7 +50,11 @@ func runLightHelper(action string) error {
 func initInteriorLight() {
 	lightWasOn.Store(false)
 	if err := runLightHelper("disable"); err != nil {
+		setLightStatus("disable", "startup clear failed: "+err.Error(), false)
+		addStatusError("light", "startup clear failed: "+err.Error())
 		log.Printf("[light] startup clear failed: %v", err)
+	} else {
+		setLightStatus("disable", "startup clear", false)
 	}
 }
 
@@ -72,8 +76,11 @@ func setInteriorLight(on bool) {
 	if err := runLightHelper(action); err != nil {
 		// Let the next poll retry the transition instead of suppressing it.
 		lightWasOn.Store(!on)
+		setLightStatus(action, "failed: "+err.Error(), !on)
+		addStatusError("light", "helper call failed: "+err.Error())
 		log.Printf("[light] helper call failed: %v", err)
 	} else {
+		setLightStatus(action, "ok", on)
 		log.Printf("[light] %v", on)
 	}
 }

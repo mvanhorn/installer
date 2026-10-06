@@ -31,6 +31,7 @@ mkdir -p "$DEST"
 # Stamp every generated script with the build time so a log pasted back from
 # the live system can be matched to the exact ISO that produced it.
 date -u +%Y%m%dT%H%M%SZ > "$DEST/BUILD_ID"
+printf '%s\n' "${JUNE_VERSION:-0.5}" > "$DEST/VERSION"
 
 cp "$ARCH/onoven/deploy_onoven.sh" "$DEST/"
 cp "$ARCH/onoven/june_bootclear.sh.onoven" "$DEST/"
@@ -104,7 +105,10 @@ EXPECTED_SIZE="7818182656"
 TEGRARCM="$DIR/tegrarcm"
 GUIDE_URL="https://project-july.org/setup"
 BUILD_ID="$(cat "$DIR/BUILD_ID" 2>/dev/null || echo unknown)"
-echo "[*] Installer $(cat "$DIR/VERSION" 2>/dev/null || echo unknown), build: $BUILD_ID"
+VERSION="$(cat "$DIR/VERSION" 2>/dev/null || echo 0.5)"
+export JUNE_VERSION="$VERSION"
+export JUNE_BUILD_ID="$BUILD_ID"
+echo "[*] June Local $VERSION (build $BUILD_ID)"
 
 # Given a mounted source such as /dev/sda1, return the whole disk (/dev/sda).
 disk_from_source() {
@@ -335,6 +339,7 @@ if [ "$MODE" = "generate" ]; then
   [ -n "$OVEN_HOST" ] || read -rp "Hostname (optional): " OVEN_HOST
   OVEN_HOST="${OVEN_HOST:-june.local}"
   export OVEN_HOST
+  export JUNE_OVEN_IP="$OVEN_IP"
   if [ "$PERSIST" = "persist" ]; then
     JCM_PERSIST=1
   fi
