@@ -348,8 +348,8 @@ function updateDetect() {
     const html = detectHTML();
     if (d.outerHTML !== html) d.outerHTML = html;
   }
-  const go = $("#go");
-  if (go) go.disabled = !S.oven.present || ui.busy;
+  const goBtn = $("#go");
+  if (goBtn) goBtn.disabled = !S.oven.present || ui.busy;
   const eligible = ui.view === "connect" && S.oven.present && !S.job && !ui.busy &&
     !ui.error && (ui.action === "install" || ui.action === "custom");
   if (!eligible) {

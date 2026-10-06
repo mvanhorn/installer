@@ -922,7 +922,7 @@ class Handler(BaseHTTPRequestHandler):
         elif not self.is_local():
             raise ApiError(403, "Only the installer screen shows pairing codes.")
         elif target == "oven":
-            params = getattr(self.job, "params", None) or {}
+            params = getattr(app.job, "params", None) or {}
             host = str(params.get("host") or "").strip()
             if not host:
                 name = str(params.get("name") or "june").strip().rstrip(".") or "june"
