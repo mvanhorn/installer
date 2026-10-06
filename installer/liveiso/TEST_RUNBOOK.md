@@ -91,6 +91,16 @@ If it shows the text menu instead, copy `june-kiosk.log` from
 - `amdgpu_cs_ctx_create2 failed` — GPU/render-node problem; the
   `auto` → `pixman` fallback should recover.
 
+Known QEMU caveat (2026-10-06): with `-vga std` the guest gets `bochs-drm`,
+which has no PRIME import support, so wlroots rejects it on both renderers
+(`PRIME import not supported` / `Failed to open any DRM device`) and the
+kiosk correctly falls back to the text menu.  That is a VM limitation, not an
+installer bug — a QEMU build with `virtio-gpu` (or real hardware) is needed to
+render the graphical installer.  To read the kiosk log from such a VM, boot
+with `-kernel /tmp/june-vmlinuz -initrd /tmp/june-initrd.img -append
+"boot=live components toram june.ui=gui console=ttyS0,115200"` and a
+`-serial unix:...` socket.
+
 ## Backup on the same Ventoy stick
 
 - Expected backup filename:
