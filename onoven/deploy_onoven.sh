@@ -441,7 +441,17 @@ fi
 
 mkdir -p "$UDA_MNT/june/media" "$UDA_MNT/june/logs"
 chmod 0755 "$UDA_MNT/june" "$UDA_MNT/june/media" "$UDA_MNT/june/logs"
-install -m 0644 "$COMPANION_STATE_SRC" "$UDA_MNT/june/companions_state.json"
+# Preserve an existing companion registry: a normal reinstall must never force
+# clients to re-pair. The payload file only seeds a fresh /data.
+if [ -s "$UDA_MNT/june/companions_state.json" ]; then
+  reg_backup="$UDA_MNT/june/companions_state.json.preinstall-$(date +%Y%m%d-%H%M%S)"
+  cp -f "$UDA_MNT/june/companions_state.json" "$reg_backup" 2>/dev/null || true
+  reg_size="$(stat -c '%s' "$UDA_MNT/june/companions_state.json" 2>/dev/null || echo 0)"
+  echo "[+] preserving existing companion registry ($reg_size bytes; backup $(basename "$reg_backup"))"
+else
+  install -m 0644 "$COMPANION_STATE_SRC" "$UDA_MNT/june/companions_state.json"
+  echo "[+] seeded companion registry from payload"
+fi
 case "$(basename "$JCM_SRC")" in
   JuneCloudMessaging_nopin_signed.apk)
     if [ "$JCM_PERSIST" = "1" ]; then
