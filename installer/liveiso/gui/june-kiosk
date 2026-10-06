@@ -130,17 +130,18 @@ while :; do
       kill -0 "$cage_pid" 2>/dev/null || break
       sleep 0.5
     done
-    # wlroots/cage sometimes draws no cursor until the seat gets an input
-    # device event; an unplug/replug brings it back, so nudge the pointer
-    # once here instead of asking the user to replug the mouse.
-    if [ "$cog_ok" = "1" ] && command -v wlrctl >/dev/null 2>&1; then
-      echo "=== waking the pointer cursor" >>"$LOG"
+    # cage does not expose wlr-virtual-pointer and wlroots only draws the
+    # cursor after a pointer-device event (hence the mouse replug workaround).
+    # Start a tiny uinput mouse that emits one move and stays alive so the
+    # cursor is attached for the whole session.
+    if [ "$cog_ok" = "1" ] && command -v june-cursor-nudge >/dev/null 2>&1 \
+       && ! pgrep -x june-cursor-nudge >/dev/null 2>&1; then
+      echo "=== starting the uinput cursor nudge" >>"$LOG"
       (
         sleep 1
-        WAYLAND_DISPLAY=wayland-0 wlrctl pointer move 4 4 2>/dev/null
-        sleep 1
-        WAYLAND_DISPLAY=wayland-0 wlrctl pointer move -4 -4 2>/dev/null
-      ) &
+        sudo -n modprobe uinput 2>/dev/null || true
+        exec sudo -n june-cursor-nudge
+      ) >>"$LOG" 2>&1 &
     fi
     if [ "$cog_ok" != "1" ]; then
       echo "=== cog did not start within 15s; treating the renderer as failed" >>"$LOG"

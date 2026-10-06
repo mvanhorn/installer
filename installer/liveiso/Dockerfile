@@ -5,8 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     live-build xorriso isolinux syslinux-utils \
     curl ca-certificates git rsync \
-    build-essential meson ninja-build pkg-config \
-    libwayland-dev libxkbcommon-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
