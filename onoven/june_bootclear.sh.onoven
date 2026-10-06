@@ -1,10 +1,11 @@
 #!/system/bin/sh
-# June ADB-enable boot hook.
+# June ADB-enable boot hook + June Local fallback launch.
 #
 # Bypasses the `garrus adb` gate on `user` builds by forcing adb_enabled=1.
-# NOTE: the on-oven local server (june-local) is NO LONGER launched from here;
-# it is started by the dedicated `junelocal` init service in the boot ramdisk
-# (see boot_junelocal_init.img / docs/ramdisk-init-service.md).
+# The dedicated `junelocal` init service in the custom boot ramdisk normally
+# starts the server.  After a factory reset the stock boot image is restored
+# from the SAP payload and that service may be absent, so start june-local
+# from here when nothing else has.
 
 LOG_TAG="junebootclear"
 LOG_NAME="${0}:"
@@ -17,3 +18,37 @@ sync
 
 settings put global adb_enabled 1
 logi "adb_enabled forced to 1"
+
+start_june_local_fallback() {
+  [ -x /system/xbin/june-local ] || return 0
+  for f in /proc/[0-9]*/cmdline; do
+    /system/bin/busybox grep -q 'june-local' "$f" 2>/dev/null && return 0
+  done
+  /system/bin/busybox mkdir -p /data/june/logs /data/june/media 2>/dev/null
+  logi "starting june-local fallback"
+  /system/xbin/june-local \
+    --cert /system/etc/june_leaf.crt \
+    --key /system/etc/june_leaf.key \
+    --ca /system/etc/june_ca.crt \
+    --bind 0.0.0.0 --port 443 --http-port 80 \
+    --media-dir /data/june/media \
+    --log /data/june/logs/june-local.log \
+    --jsonl /data/june/logs/capture.jsonl \
+    --companion-state /data/june/companions_state.json \
+    --append >> /data/june/logs/june-local-boot.log 2>&1 &
+}
+
+# Wait for boot_completed so the dedicated junelocal service (when present)
+# has already started; the running check then avoids a duplicate.
+(
+  i=0
+  while [ "$i" -lt 90 ]; do
+    [ "$(getprop sys.boot_completed)" = "1" ] && break
+    sleep 2
+    i=$((i + 1))
+  done
+  sleep 5
+  start_june_local_fallback
+) &
+
+logi "june-local fallback scheduled"
