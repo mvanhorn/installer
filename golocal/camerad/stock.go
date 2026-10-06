@@ -7,10 +7,29 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"time"
 )
 
 const stockMaxJPEGBytes = 10 << 20
+
+// dialStock opens cameracapturerd's capture socket.  The daemon binds it in
+// the Linux abstract namespace, which /proc/net/unix shows as
+// "@/juneOS2/cameracapturerd-capture.sock" and which Go addresses with a
+// leading '@'.  Some builds bind a filesystem socket instead, so try the
+// literal path first and fall back to the abstract name.
+func dialStock(socket string) (net.Conn, error) {
+	conn, err := net.DialTimeout("unix", socket, 2*time.Second)
+	if err == nil {
+		return conn, nil
+	}
+	if !strings.HasPrefix(socket, "@") && !strings.HasPrefix(socket, "\x00") {
+		if abstract, err2 := net.DialTimeout("unix", "@"+socket, 2*time.Second); err2 == nil {
+			return abstract, nil
+		}
+	}
+	return nil, err
+}
 
 // runStockBridge serves idle live-view frames by asking the stock
 // cameracapturerd daemon for rectified JPEGs over its Unix socket. It never
@@ -32,7 +51,7 @@ func runStockBridge(socket, relay, trigger string, fps, format int) {
 			time.Sleep(250 * time.Millisecond)
 			continue
 		}
-		conn, err := net.DialTimeout("unix", socket, 2*time.Second)
+		conn, err := dialStock(socket)
 		if err != nil {
 			log.Printf("camerad: stock socket unavailable (%s): %v", socket, err)
 			time.Sleep(time.Second)

@@ -405,6 +405,10 @@ else
   export REMOTES_SRC=""
   export CERT_SRC="$DIR/junelife_chain_godaddy_intermediate.crt"
   export KEY_SRC="$DIR/june-local.key"
+  # The factory MediaCapturer pins June's original certificates, so its
+  # cook-time stills cannot reach june-local. Use the no-pin build in basic
+  # mode too; without it the live view is blank while a cook is running.
+  export MEDIACAPTURER_SRC="$DIR/MediaCapturer_nopin_signed.apk"
 fi
 
 echo "[debug] MODE=$MODE"
