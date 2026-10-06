@@ -122,7 +122,7 @@ type ClientsStatus struct {
 type CommandStatus struct {
 	Code       int       `json:"code"`
 	Mode       string    `json:"mode,omitempty"`
-	Client     string    `json:"client,omitempty"`
+	Client     string    `json:"-"`
 	Status     string    `json:"status"`
 	AgeSeconds int64     `json:"age_seconds"`
 	At         time.Time `json:"-"`
@@ -377,6 +377,9 @@ func refreshStatus(hub *Hub, cfg *Config) {
 	d.Oven.SystemSlot, d.Oven.CollectorMounted = systemSlot()
 	d.Camera = cameraStatus(cfg)
 	d.Light = lightStatusSnapshot()
+	if _, err := os.Stat("/system/app/JuneLight/JuneLight.apk"); err == nil {
+		d.Light.HelperInstalled = true
+	}
 	d.Install = installStatus(cfg)
 	d.Network = networkStatus(cfg)
 	d.Cert = certStatus(cfg, d.Network)
@@ -693,6 +696,11 @@ func buildProblems(d StatusData) []Problem {
 		add("amber", "storage-low", "Storage is running low",
 			fmt.Sprintf("/data has %.0f%% free.", d.Storage.DataFreePct),
 			"Free space before taking a backup or reinstalling.")
+	}
+	if d.Presets.CatalogEntries == 0 {
+		add("amber", "presets-empty", "Preset content is missing",
+			"Guided programs and recipes load from the local preset mirror.",
+			"Reinstall from the 0.5+ USB image, or re-stage the upstream-content mirror.")
 	}
 	return out
 }
