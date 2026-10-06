@@ -38,6 +38,13 @@ func handleLocalCA(cfg *Config, w http.ResponseWriter, r *http.Request) {
 		name = "june-local-chain.crt"
 	}
 	b, err := os.ReadFile(path)
+	if err != nil && path != cfg.Cert {
+		// Basic installs keep the factory chain in the leaf path and have no
+		// separate CA file; serve that chain instead of a dead download.
+		path = cfg.Cert
+		name = "june-local-chain.crt"
+		b, err = os.ReadFile(path)
+	}
 	if err != nil {
 		http.NotFound(w, r)
 		return

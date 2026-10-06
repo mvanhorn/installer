@@ -414,6 +414,9 @@ else
   # cook-time stills cannot reach june-local. Use the no-pin build in basic
   # mode too; without it the live view is blank while a cook is running.
   export MEDIACAPTURER_SRC="$DIR/MediaCapturer_nopin_signed.apk"
+  # Basic installs have no per-home CA; serve the factory GoDaddy chain from
+  # /local/ca.crt so the status page's download works here too.
+  export CA_SRC="$DIR/junelife_chain_godaddy_intermediate.crt"
 fi
 
 echo "[debug] MODE=$MODE"

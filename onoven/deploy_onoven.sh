@@ -159,10 +159,15 @@ install_system_files() {
   install -m 0755 "$CAMERAD_SRC" "$mnt/xbin/june-camerad"
   install -m 0644 "$CERT_SRC" "$mnt/etc/june_leaf.crt"
   install -m 0600 "$KEY_SRC" "$mnt/etc/june_leaf.key"
+  if [ -n "$CA_SRC" ]; then
+    # Served at /local/ca.crt.  Custom installs hand out the per-home CA and
+    # also add it to the system store; basic installs hand out the factory
+    # chain and leave the store alone.
+    install -m 0644 "$CA_SRC" "$mnt/etc/june_ca.crt"
+  fi
   if [ -n "$CA_SRC" ] && [ -n "$CA_HASH" ]; then
     mkdir -p "$mnt/etc/security/cacerts"
     install -m 0644 "$CA_SRC" "$mnt/etc/security/cacerts/$CA_HASH.0"
-    install -m 0644 "$CA_SRC" "$mnt/etc/june_ca.crt"
   fi
   install -m 0755 "$BOOTCLEAR_SRC" "$mnt/bin/june_bootclear.sh"
   # june_reaper.sh is the stock boot script that mounts the encrypted
