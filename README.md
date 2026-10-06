@@ -74,5 +74,4 @@ the installer leaves the stock Chef whitelist in place.
 - Prebuilt armv7 binaries (`june-local`, `june-camerad`) and the boot image
 - The stock and patched Chef APK (`Chef.apk` / `Chef_cookmodes_signed.apk`)
 
-The recipes under `windows-work/` rebuild the patched apps from a
-locally supplied factory APK. Keys and blobs must never be committed.
+The recipes rebuild, the patched apps, Keys and blobs.
