@@ -36,3 +36,15 @@ The order follows the basic/custom install journey: home, basic options,
 persistence, custom options, connect (waiting), oven found with the 3 s
 auto-start, installing, success with QR codes, backup destination, restore
 confirmation, and the phone-access sheet.
+
+## KVM verification (2026-10-06)
+
+`vm-verify/` holds screendumps from the 0.5 release ISO booted in KVM with
+`-device virtio-gpu-pci` (Arch splits the device into qemu-hw-display-virtio-gpu
++ qemu-hw-display-virtio-gpu-pci):
+
+- `01-home-cursor.png` - graphical home screen; the cursor is visible even
+  though the VM has no mouse, which verifies the uinput cursor nudge;
+- `02-keyboard-focus.png` - Tab moves the focus ring across the tiles;
+- `03-basic-options.png` - Enter opens the basic install options (oven name,
+  persistence off by default).
