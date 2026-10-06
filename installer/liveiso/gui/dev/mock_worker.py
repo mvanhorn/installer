@@ -21,7 +21,7 @@ def say(line: str, delay: float = 0.6) -> None:
 
 
 def connect(fail: bool) -> None:
-    say("[*] Installer build: dev")
+    say("[*] Installer dev, build: dev")
     say("[*] Looking for an existing June UMS disk (up to 15s)...", 1.5)
     say("[*] Waiting for June APX device (0955:7740). Put the oven in RCM now (SW2 + power).", 2.5)
     say("[*] Oven is not in UMS mode. Loading U-Boot with tegrarcm...")

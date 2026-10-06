@@ -11,6 +11,8 @@ cd "$WORK"
 PAYLOAD="/opt/june-installer"
 mkdir -p "config/includes.chroot$PAYLOAD"
 rsync -a /build/assets/ "config/includes.chroot$PAYLOAD/"
+# Release version stamped by build_live_iso.sh; shown in the boot menus.
+JUNE_VERSION="$(cat /build/assets/VERSION 2>/dev/null || echo dev)"
 
 # The source tree may live on CIFS, where chmod +x does not stick.  Ensure the
 # on-oven binaries/scripts are executable inside the final live image.
@@ -136,6 +138,7 @@ INSTALL="$PAYLOAD/install.sh"
 BACKUP="$PAYLOAD/backup.sh"
 GUIDE_URL="https://project-july.org/setup"
 BUILD_ID="$(cat "$PAYLOAD/BUILD_ID" 2>/dev/null || echo unknown)"
+VERSION="$(cat "$PAYLOAD/VERSION" 2>/dev/null || echo unknown)"
 
 on_interrupt() {
   stty sane 2>/dev/null || true
@@ -152,7 +155,7 @@ sudo -n dmesg -n 1 2>/dev/null || true
 banner() {
   echo "=============================================="
   echo " June Local installer"
-  echo " build $BUILD_ID"
+  echo " $VERSION (build $BUILD_ID)"
   echo "=============================================="
 }
 
@@ -577,7 +580,7 @@ show_restore_done() {
 if command -v whiptail >/dev/null 2>&1; then
   while true; do
     CHOICE="$(whiptail --title "June Local installer" \
-      --menu "Build: $BUILD_ID\n\nConnect the oven via USB. Guide: $GUIDE_URL\n\nChoose an action:" \
+      --menu "Version: $VERSION (build $BUILD_ID)\n\nConnect the oven via USB. Guide: $GUIDE_URL\n\nChoose an action:" \
       20 78 8 \
       "install" "Install June Local (recommended)" \
       "custom" "Install with per-home CA + leaf (advanced)" \
@@ -829,32 +832,33 @@ lb config \
 # Boot the default automatically after 5 seconds instead of waiting for a key
 # press.  ISOLINUX uses tenths of a second, so 50 = 5 seconds.  live-build
 # fills in the @...@ kernel/initrd/append placeholders (binary_grub_cfg for
-# GRUB/UEFI, live.cfg.in for ISOLINUX/BIOS).
+# GRUB/UEFI, live.cfg.in for ISOLINUX/BIOS).  These two heredocs are unquoted
+# only to fill in $JUNE_VERSION; keep them free of other $ and backticks.
 mkdir -p config/bootloaders/grub-pc config/bootloaders/isolinux
-cat > config/bootloaders/grub-pc/grub.cfg <<'EOF'
+cat > config/bootloaders/grub-pc/grub.cfg <<EOF
 source /boot/grub/config.cfg
 
-menuentry "Install June Local - graphical (default)" --hotkey=g {
+menuentry "Install June Local ${JUNE_VERSION} - graphical (default)" --hotkey=g {
 	linux	@KERNEL_LIVE@ @APPEND_LIVE@ june.ui=gui
 	initrd	@INITRD_LIVE@
 }
 
-menuentry "Install June Local - text mode (basic UI)" --hotkey=t {
+menuentry "Install June Local ${JUNE_VERSION} - text mode (basic UI)" --hotkey=t {
 	linux	@KERNEL_LIVE@ @APPEND_LIVE@ june.ui=text
 	initrd	@INITRD_LIVE@
 }
 EOF
 
-cat > config/bootloaders/isolinux/live.cfg.in <<'EOF'
+cat > config/bootloaders/isolinux/live.cfg.in <<EOF
 label june-gui
-	menu label ^Install June Local - graphical (default)
+	menu label ^Install June Local ${JUNE_VERSION} - graphical (default)
 	menu default
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ june.ui=gui
 
 label june-text
-	menu label Install June Local - text mode (basic UI)
+	menu label Install June Local ${JUNE_VERSION} - text mode (basic UI)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ june.ui=text

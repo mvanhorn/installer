@@ -104,7 +104,7 @@ EXPECTED_SIZE="7818182656"
 TEGRARCM="$DIR/tegrarcm"
 GUIDE_URL="https://project-july.org/setup"
 BUILD_ID="$(cat "$DIR/BUILD_ID" 2>/dev/null || echo unknown)"
-echo "[*] Installer build: $BUILD_ID"
+echo "[*] Installer $(cat "$DIR/VERSION" 2>/dev/null || echo unknown), build: $BUILD_ID"
 
 # Given a mounted source such as /dev/sda1, return the whole disk (/dev/sda).
 disk_from_source() {
@@ -1120,7 +1120,7 @@ if [ "$MODE" = "images" ]; then
 fi
 
 if [ -f "$DIR/BUILD_ID" ]; then
-  echo "[*] Installer build: $(cat "$DIR/BUILD_ID")"
+  echo "[*] Installer $(cat "$DIR/VERSION" 2>/dev/null || echo unknown), build: $(cat "$DIR/BUILD_ID")"
 fi
 
 wait_for_ums

@@ -67,3 +67,23 @@ june-installer/
 With that layout, set `JUNE_LR` to the published root and provide `blobs/`
 locally (or download it from a restricted release) before running
 `prepare_assets.sh`.
+
+## Releasing an ISO
+
+The download filename is always `june-local-live.iso`, so the Ventoy setup
+(`ventoy.json` pins `/june-local-live.iso`) never changes.  The version lives
+in the download URL and inside the ISO: boot menu entries, the GUI header,
+the text menu, and every install/backup log.
+
+1. Tag the release commit: `git tag v0.6 && git push origin v0.6`.
+   `build_live_iso.sh` stamps `git describe` into `assets/VERSION`, so the
+   tagged commit builds as `v0.6`; anything else builds as e.g.
+   `v0.6-3-g9a0350c` (`-dirty` with uncommitted changes) and is clearly not a
+   release.  `JUNE_VERSION=...` overrides it.
+2. `./prepare_assets.sh && ./build_live_iso.sh`, then boot-test the ISO.
+3. `sha256sum june-local-live.iso`.
+4. Upload to R2 as `installer/v0.6/june-local-live.iso`.  Never overwrite a
+   published version; old versions stay downloadable.
+5. Point the `https://downloads.project-july.org/installer/latest` redirect
+   (302) at the new object.
+6. Update the SHA256 on the website and in `CREATE_VENTOY_USB.md`.

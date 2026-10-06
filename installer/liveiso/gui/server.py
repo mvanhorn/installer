@@ -306,7 +306,8 @@ class App:
         self.allowed_dests: set[str] = set()
         self.allowed_images: dict[str, set[str]] = {}
         self.dest_mounts: dict[str, str] = {}
-        self.build_id = self._read_build_id()
+        self.build_id = self._read_payload_stamp("BUILD_ID")
+        self.version = self._read_payload_stamp("VERSION")
         self.ips: list[str] = []
         self.ips_at = 0.0
         # --advertise HOST[:PORT]: the address phones should use, when it is
@@ -318,9 +319,9 @@ class App:
 
     # ---- helpers -------------------------------------------------------
 
-    def _read_build_id(self) -> str:
+    def _read_payload_stamp(self, name: str) -> str:
         try:
-            return (self.payload / "BUILD_ID").read_text().strip() or "unknown"
+            return (self.payload / name).read_text().strip() or "unknown"
         except OSError:
             return "dev" if self.mock else "unknown"
 
@@ -469,6 +470,7 @@ class App:
             ips = self.addresses()
             st = {
                 "build": self.build_id,
+                "version": self.version,
                 "mock": {"oven": self.mock_oven, "fail": self.mock_fail} if self.mock else None,
                 "local": local,
                 "guide": GUIDE_URL,

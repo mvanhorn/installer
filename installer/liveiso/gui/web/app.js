@@ -102,7 +102,7 @@ function toast(msg) {
 
 function renderHeader() {
   if (!S) return;
-  $("#brand-sub").textContent = S.local ? `June Local installer · build ${S.build}` : "June Local installer · on your phone";
+  $("#brand-sub").textContent = S.local ? `June Local installer ${S.version} · build ${S.build}` : "June Local installer · on your phone";
   const chip = $("#oven-chip");
   const job = S.job && S.job.status === "running";
   let html;
