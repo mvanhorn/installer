@@ -10,8 +10,9 @@ installer. It is written so a website author can turn it into a tutorial.
 - A Windows or Linux computer. Windows users can use the Ventoy GUI; Linux
   users use `Ventoy2Disk.sh`.
 - Ventoy from the official site: <https://www.ventoy.net>.
-- The latest `june-local-live.iso` from the Project July release page (the
-  website should link and show the current SHA256).
+- The latest `june-local-live.iso` from
+  <https://downloads.project-july.org/installer/latest> (the website should
+  link it and show the current SHA256).
 - Optional: a second USB drive for the oven backup if the Ventoy stick does
   not have enough free space.
 
@@ -39,8 +40,8 @@ installer. It is written so a website author can turn it into a tutorial.
 ## Step 1 — Download and verify
 
 1. Download Ventoy from <https://www.ventoy.net> (official download).
-2. Download the latest `june-local-live.iso` from the Project July release
-   page.
+2. Download the latest `june-local-live.iso` from
+   <https://downloads.project-july.org/installer/latest>.
 3. Verify the ISO before copying it:
 
    Windows PowerShell:
