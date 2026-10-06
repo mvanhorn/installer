@@ -477,7 +477,7 @@ Oven LAN IP and hostname:"
 
   persist_flag=""
   if whiptail --title "Factory-reset persistence" --defaultno \
-    --yesno "Persist the patch payload in /system so it survives a factory reset?\n\nNo (default, recommended): the JCM/Remotes patches are staged in /data only; a factory reset removes them.\nYes: they are staged in /system and re-applied after a factory reset." \
+    --yesno "Keep June Local after a factory reset?\n\nNo (default): the June Local patches (cook modes, camera, light, messaging) and the per-home CA are staged in /data only; a factory reset removes them.\nYes: they are staged in /system and re-applied after a factory reset." \
     16 78 --yes-button "Persist" --no-button "Do not persist"; then
     persist_flag="persist"
   fi
@@ -490,7 +490,7 @@ Oven LAN IP and hostname:"
   if run_install generate "$ip" "$host" "$persist_flag"; then
     PATCH_STAGED=1
     persist_log
-    show_success "Then install ca.crt on the phone, install the companion app, and set the oven endpoint.${persist_flag:+ The JCM patch payload is staged in /system and persists across factory resets.}"
+    show_success "Then install ca.crt on the phone, install the companion app, and set the oven endpoint.${persist_flag:+ The June Local patches are staged in /system and persist across factory resets.}" "http://${host}/local"
   else
     persist_log
     show_failure "Install"
@@ -537,16 +537,32 @@ Full log stays at: $INSTALL_LOG"
 }
 
 show_success() {
-  local extra="$1" patch_line=""
+  local extra="$1" oven_url="${2:-}" patch_line=""
   if [ "${PATCH_STAGED:-0}" = "1" ]; then
-    patch_line="The JuneCloudMessaging patch is applied on the oven's next power-on.\n\n"
+    patch_line="The June Local patches are applied on the oven's next power-on.\n\n"
   fi
   whiptail --title "June Local installer" \
     --msgbox "Success! June Local is installed on the oven.\n\n${patch_line}TEST NOW (recommended, before closing up):\n1. Unplug the oven power and the USB cable from this computer.\n2. Wait ~10 seconds, then plug the power back in.\n3. Let the oven boot normally.\n4. Check June Local (next screen) and pair from the June app / Home Assistant.\n\nOR CLOSE UP FIRST:\n1. Unplug power and USB, then close/reassemble the oven.\n2. Power it on normally - it should just work.\n3. Pair when convenient.\n\n${extra}\n\n${PERSIST_MSG}" \
     24 78
   whiptail --title "Check June Local is running" \
-    --msgbox "From any device on the same network, open:\n\n    http://<oven-ip>/local\n\nYou should see the June Local status page. A machine-readable check is:\n    http://<oven-ip>/local/status\n\nThen pair/control from the June app or Home Assistant. Live temperature and cook controls with no cloud errors mean the oven is running June Local." \
+    --msgbox "From any device on the same network, open:\n\n    ${oven_url:-http://<oven-ip>/local}\n\nYou should see the June Local status page. A machine-readable check is:\n    ${oven_url:-http://<oven-ip>/local}/status\n\nThen pair/control from the June app or Home Assistant. Live temperature and cook controls with no cloud errors mean the oven is running June Local." \
     18 78
+  if command -v qrencode >/dev/null 2>&1; then
+    clear
+    echo "=============================================================="
+    echo "  June Local is installed"
+    echo "=============================================================="
+    if [ -n "$oven_url" ]; then
+      echo
+      echo "Status page: $oven_url"
+      qrencode -t ANSIUTF8 "$oven_url" 2>/dev/null || true
+    fi
+    echo
+    echo "Setup guide: $GUIDE_URL"
+    qrencode -t ANSIUTF8 "$GUIDE_URL" 2>/dev/null || true
+    echo
+    read -r -p "Press Enter to return to the menu..." _ || true
+  fi
 }
 
 show_failure() {
@@ -598,7 +614,7 @@ if command -v whiptail >/dev/null 2>&1; then
         oven_name="${oven_name:-june}"
         persist_flag=""
         if whiptail --title "Factory-reset persistence" --defaultno \
-          --yesno "Persist the patch payload in /system so it survives a factory reset?\n\nNo (default, recommended): the standard install keeps the oven's factory apps; nothing is written to /system for them.\nYes: also stage the no-pin JCM patch in /system, so it survives a factory reset (needed only if you later switch this oven to a per-home CA)." \
+          --yesno "Keep June Local after a factory reset?\n\nNo (default, recommended): the June Local patches (cook modes, camera, light, messaging) are staged in /data only; a factory reset removes them.\nYes: they are staged in /system and re-applied after a factory reset." \
           16 78 --yes-button "Persist" --no-button "Do not persist"; then
           persist_flag="persist"
         fi
@@ -612,7 +628,7 @@ if command -v whiptail >/dev/null 2>&1; then
         run_install prepackaged "$oven_name" "$persist_flag" || install_ok=1
         if [ "$install_ok" -eq 0 ]; then
           persist_log
-          show_success "Then install the companion app and set the oven endpoint using the steps printed below.${persist_flag:+ The no-pin JCM patch is staged in /system and persists across factory resets; the oven applies it on the next boot.}"
+          show_success "Then install the companion app and set the oven endpoint using the steps printed below.${persist_flag:+ The June Local patches are staged in /system and persist across factory resets; the oven applies them on the next boot.}" "http://${oven_name}.local/local"
         else
           persist_log
           show_failure
@@ -725,7 +741,7 @@ else
       echo "this may take up to about 2 minutes."
       echo "Connection guide: $GUIDE_URL"
       read -rp "Press Enter when the oven is in RCM mode: "
-      if run_install generate "${oven_ip:?}" "${oven_host:-oven.local}"; then
+      if run_install generate "${oven_ip:?}" "${oven_host:-june.local}"; then
         echo "Success. Unplug the oven power and the USB cable."
         echo "TEST NOW: power it back on, then open http://<oven-ip>/local to confirm"
         echo "June Local, and pair from the June app / Home Assistant."

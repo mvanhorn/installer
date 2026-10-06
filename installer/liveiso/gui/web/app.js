@@ -62,7 +62,13 @@ let S = null; // last server state
 const ui = {
   view: "home", action: null, form: {}, dests: null, destErr: "", images: null,
   error: "", busy: false, jobKey: "", logOpen: false, armed: "",
+  autoAt: 0, autoTimer: 0,
 };
+
+function stopAutoStart() {
+  if (ui.autoTimer) { clearInterval(ui.autoTimer); ui.autoTimer = 0; }
+  ui.autoAt = 0;
+}
 
 /* ---- Helpers ------------------------------------------------------------ */
 
@@ -124,6 +130,7 @@ function renderHeader() {
 /* ---- Views -------------------------------------------------------------- */
 
 function setView(view, extra) {
+  stopAutoStart();
   Object.assign(ui, { view, error: "" }, extra || {});
   render();
   window.scrollTo(0, 0);
@@ -231,7 +238,7 @@ function viewOptions() {
         <div class="field"><label for="f-name">Oven name</label><input id="f-name" name="name" autocomplete="off" spellcheck="false" value="${esc(f.name == null ? "june" : f.name)}"><div class="hint">Used for the oven's mDNS name &lt;name&gt;.local. The prepackaged certificate covers june.local; use the oven IP for HTTPS with a custom name.</div></div>
       </div>
       <div class="opts">
-        ${opt("persist", "Keep the no-pin patch after a factory reset", "Off by default. Only needed if you plan to switch this oven to your own CA later.", f.persist)}
+        ${opt("persist", "Keep June Local after a factory reset", "Stores the June Local patches (cook modes, camera, light and messaging) in /system so a factory reset keeps them. Off by default.", f.persist)}
       </div>`;
   } else if (ui.action === "custom") {
     body = `
@@ -239,10 +246,10 @@ function viewOptions() {
       <p class="muted">A private certificate authority is created on this USB stick. It signs a certificate for your oven's address, and you install the CA on your phone afterwards.</p>
       <div class="fields">
         <div class="field"><label for="f-ip">Oven LAN IP</label><input id="f-ip" name="ip" inputmode="decimal" autocomplete="off" placeholder="192.168.1.50" value="${esc(f.ip || "")}"><div class="hint">Reserve this address for the oven in your router.</div></div>
-        <div class="field"><label for="f-host">Hostname</label><input id="f-host" name="host" autocomplete="off" spellcheck="false" value="${esc(f.host == null ? "oven.local" : f.host)}"></div>
+        <div class="field"><label for="f-host">Hostname</label><input id="f-host" name="host" autocomplete="off" spellcheck="false" value="${esc(f.host == null ? "june.local" : f.host)}"></div>
       </div>
       <div class="opts">
-        ${opt("persist", "Keep the patch after a factory reset", "Stores the patched messaging app in /system so a factory reset doesn't remove it.", f.persist)}
+        ${opt("persist", "Keep June Local after a factory reset", "Stores the June Local patches and the per-home CA in /system so a factory reset keeps them.", f.persist)}
       </div>`;
     canNext = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(f.ip || "");
   } else {
@@ -325,18 +332,46 @@ const ILLUSTRATION = `
 function detectHTML() {
   const o = S.oven;
   if (o.present) {
-    return `<div class="detect found" id="detect">${MARK.ok}<div><div class="detect-word">Oven found · ${o.mode === "apx" ? "RCM mode" : "storage open"}</div><div class="detect-sub">${o.mode === "apx" ? "You can let go of SW2." : "The oven's storage is already open."}</div></div></div>`;
+    const auto = (ui.action === "install" || ui.action === "custom") && !ui.busy && !S.job && ui.autoAt;
+    const remaining = auto ? Math.max(0, Math.ceil((ui.autoAt - Date.now()) / 1000)) : 0;
+    const sub = auto
+      ? `Starting June Local in ${remaining} s… press Back to stop.`
+      : (o.mode === "apx" ? "You can let go of SW2." : "The oven's storage is already open.");
+    return `<div class="detect found" id="detect">${MARK.ok}<div><div class="detect-word">Oven found · ${o.mode === "apx" ? "RCM mode" : "storage open"}</div><div class="detect-sub">${sub}</div></div></div>`;
   }
   return `<div class="detect" id="detect">${MARK.run}<div><div class="detect-word">Waiting for the oven</div><div class="detect-sub">Looking for it on USB. This updates by itself.</div></div></div>`;
 }
 
 function updateDetect() {
   const d = $("#detect");
-  if (!d) return;
-  const html = detectHTML();
-  if (d.outerHTML !== html) d.outerHTML = html;
+  if (d) {
+    const html = detectHTML();
+    if (d.outerHTML !== html) d.outerHTML = html;
+  }
   const go = $("#go");
   if (go) go.disabled = !S.oven.present || ui.busy;
+  const eligible = ui.view === "connect" && S.oven.present && !S.job && !ui.busy &&
+    !ui.error && (ui.action === "install" || ui.action === "custom");
+  if (!eligible) {
+    stopAutoStart();
+    return;
+  }
+  if (ui.autoAt) return;
+  ui.autoAt = Date.now() + 3000;
+  ui.autoTimer = setInterval(() => {
+    const still = ui.view === "connect" && S.oven.present && !S.job && !ui.busy &&
+      !ui.error && (ui.action === "install" || ui.action === "custom");
+    if (!still) {
+      stopAutoStart();
+      return;
+    }
+    const el = $("#detect");
+    if (el) el.outerHTML = detectHTML();
+    if (Date.now() >= ui.autoAt) {
+      stopAutoStart();
+      go();
+    }
+  }, 250);
 }
 
 function viewConnect() {
@@ -348,17 +383,17 @@ function viewConnect() {
       <div>
         <p class="eyebrow">${esc(a.name)}</p>
         <h2>Put the oven in recovery mode</h2>
-        <div class="connect">
-          <div class="illus">${ILLUSTRATION}</div>
+      <div class="connect">
           <div>
             <ol class="steps">
               <li><span>Connect the oven to this computer with the USB cable. Use a port on the computer itself, not a hub.</span></li>
               <li><span>Press and hold <b>SW2</b> (force recovery) on the oven's board.</span></li>
               <li><span>Switch the oven's power on and keep holding SW2 for about 10 seconds.</span></li>
             </ol>
-            ${detectHTML()}
           </div>
+          <div class="illus">${ILLUSTRATION}</div>
         </div>
+        ${detectHTML()}
         ${errLine()}
         <div class="actions">
           <button class="btn${danger ? " danger" : ""}" type="button" id="go" data-do="go"${S.oven.present && !ui.busy ? "" : " disabled"}>${esc(a.go)}</button>
@@ -451,6 +486,16 @@ function updateJob(j) {
   }
 }
 
+function qrCard(target, title, sub) {
+  return `<div class="dl-card"><div class="qr"><img alt="QR code for ${esc(title)}" src="/api/qr?for=${target}" onerror="this.parentNode.hidden=true"></div><div><div class="opt-title">${title}</div><div class="opt-sub">${sub}</div></div></div>`;
+}
+
+function infoQR(j) {
+  if (!S.local) return "";
+  const host = j.params.host || ((j.params.name || "june") + ".local");
+  return `<div class="dl">${qrCard("oven", "June Local status page", `http://${esc(host)}/local — scan from a device on the same network.`)}${qrCard("guide", "Setup guide", "project-july.org/setup — phone setup and client downloads.")}</div>`;
+}
+
 function downloadsHTML(j) {
   const files = [];
   if (j.action === "custom" && S.files["ca.crt"]) files.push(["ca.crt", "Your home's CA certificate", "Install it on the phone: Settings › Security › Install a certificate › CA certificate.", "your CA certificate"]);
@@ -479,8 +524,8 @@ function jobResult(j) {
         <li>From a device on the same network, open <b>http://&lt;oven-ip&gt;/local</b>. You should see the June Local status page.</li>
         <li>Pair from the June app or Home Assistant. Then close up the oven.</li>
       </ol>
-      ${j.params.persist ? `<p class="muted small" style="margin-top:12px">The no-pin patch is staged in /system and is applied on the oven's next start.</p>` : ""}
-      ${downloadsHTML(j)}`;
+      ${j.params.persist ? `<p class="muted small" style="margin-top:12px">The June Local patches are staged in /system and are re-applied on the oven's next start.</p>` : ""}
+      ${infoQR(j)}${downloadsHTML(j)}`;
   } else if (ok && j.action === "backup") {
     body = `<p class="muted">Saved as <b>${esc([j.params.folder, j.params.filename].filter(Boolean).join("/"))}</b>, with a .sha256 file next to it. Safely unplug the drive, then unplug the oven's power and USB cable.</p>`;
   } else if (ok) {
@@ -696,7 +741,7 @@ function jobBody() {
   const f = ui.form;
   const body = { action: ui.action, persist: !!f.persist };
   if (ui.action === "install") Object.assign(body, { name: f.name == null ? "june" : f.name });
-  if (ui.action === "custom") Object.assign(body, { ip: f.ip, host: f.host == null ? "oven.local" : f.host });
+  if (ui.action === "custom") Object.assign(body, { ip: f.ip, host: f.host == null ? "june.local" : f.host });
   if (ui.action === "backup") Object.assign(body, { dest: f.dest, folder: f.folder || "", filename: f.filename || defaultFilename() });
   if (ui.action === "restore") Object.assign(body, { dest: f.dest, folder: f.folder || "", image: f.image, confirm: f.confirm });
   return body;

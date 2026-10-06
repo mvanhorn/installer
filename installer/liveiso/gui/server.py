@@ -505,7 +505,7 @@ class App:
             argv = self.worker("install.sh") + ["prepackaged", name] + (["persist"] if persist else [])
         elif action == "custom":
             ip = str(body.get("ip", "")).strip()
-            host = str(body.get("host", "")).strip() or "oven.local"
+            host = str(body.get("host", "")).strip() or "june.local"
             try:
                 ipaddress.IPv4Address(ip)
             except ValueError:
@@ -921,6 +921,13 @@ class Handler(BaseHTTPRequestHandler):
             text = GUIDE_URL
         elif not self.is_local():
             raise ApiError(403, "Only the installer screen shows pairing codes.")
+        elif target == "oven":
+            params = getattr(self.job, "params", None) or {}
+            host = str(params.get("host") or "").strip()
+            if not host:
+                name = str(params.get("name") or "june").strip().rstrip(".") or "june"
+                host = name if name.endswith(".local") else name + ".local"
+            text = f"http://{host}/local"
         elif not app.remote_enabled or not ips:
             raise ApiError(409, "Phone access is off or there is no network.")
         elif target == "phone":

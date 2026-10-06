@@ -203,7 +203,7 @@ a.btn { text-decoration: none; }
 .steps { list-style: none; counter-reset: s; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .steps li { counter-increment: s; display: flex; gap: 12px; font: 400 17px/1.4 var(--f); }
 .steps li::before { content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 14px/1 var(--f); box-shadow: inset 0 0 0 1.5px var(--ember); color: var(--ember2); margin-top: -1px; }
-.detect { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); }
+.detect { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; margin-top: 18px; box-shadow: inset 0 0 0 1px var(--line); }
 .detect .mark { width: 34px; height: 34px; }
 .detect-word { font: 600 14px/20px var(--f); letter-spacing: .07em; text-transform: uppercase; }
 .detect-sub { font: 400 15px/1.35 var(--f); color: var(--fg2); }
