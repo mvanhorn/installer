@@ -923,7 +923,11 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(403, "Only the installer screen shows pairing codes.")
         elif target == "oven":
             params = getattr(app.job, "params", None) or {}
-            host = str(params.get("host") or "").strip()
+            # Prefer the LAN IP a custom install used for the certificate; it
+            # resolves even where mDNS (*.local) does not.
+            host = str(params.get("ip") or "").strip()
+            if not host:
+                host = str(params.get("host") or "").strip()
             if not host:
                 name = str(params.get("name") or "june").strip().rstrip(".") or "june"
                 host = name if name.endswith(".local") else name + ".local"

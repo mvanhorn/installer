@@ -492,7 +492,10 @@ function qrCard(target, title, sub) {
 
 function infoQR(j) {
   if (!S.local) return "";
-  const host = j.params.host || ((j.params.name || "june") + ".local");
+  // Custom installs know the oven's LAN IP, so the QR keeps working even on
+  // networks where mDNS (*.local) is not resolved.  Basic installs fall back
+  // to the hostname.
+  const host = (j.params.ip || "").trim() || j.params.host || ((j.params.name || "june") + ".local");
   return `<div class="dl">${qrCard("oven", "June Local status page", `http://${esc(host)}/local — scan from a device on the same network.`)}${qrCard("guide", "Setup guide", "project-july.org/setup — phone setup and client downloads.")}</div>`;
 }
 

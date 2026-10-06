@@ -32,7 +32,7 @@ PNG = HERE / "png"
 PORT = int(os.environ.get("MOCK_PORT", "8765"))
 BASE = f"http://127.0.0.1:{PORT}"
 VERSION = os.environ.get("JUNE_VERSION", "0.5")
-BUILD_ID = os.environ.get("JUNE_BUILD_ID", "20261006-0123-26e73837")
+BUILD_ID = os.environ.get("JUNE_BUILD_ID", "20261006-0239-ee9c28d0")
 
 STAGES = [
     ("01-home.png", "Installer home",
