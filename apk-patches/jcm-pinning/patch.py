@@ -5,8 +5,9 @@ Usage: python3 patch.py <apktool-decoded-dir>
 """
 import re, os, sys
 
-decoded = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    r"C:\Users\Gene\AppData\Local\Temp\jcm_pinning", "decoded")
+if len(sys.argv) != 2:
+    raise SystemExit("usage: python3 patch.py <apktool-decoded-dir>")
+decoded = sys.argv[1]
 base = os.path.join(decoded, "smali", "com", "junelife", "android", "networkclient")
 
 # 1. HttpClientFactory.createCertificatePinner() -> empty pinner

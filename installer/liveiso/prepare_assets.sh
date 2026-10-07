@@ -42,16 +42,16 @@ cp "$ARCH/golocal/bin/june-camerad-linux-armv7" "$DEST/"
 cp "$ROOT/tools/certs/junelife_chain_godaddy_intermediate.crt" "$DEST/"
 cp "$ROOT/tools/certs/june-local.key" "$DEST/"
 cp "$LR/june-rcm/healthy-build/decrypted-priv-app/JuneCloudMessaging.apk" "$DEST/"
-cp "$ARCH/windows-work/jcm-pinning/JuneCloudMessaging_nopin_signed.apk" "$DEST/"
-cp "$ARCH/windows-work/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
-cp "$ARCH/windows-work/mediacapturer-pinning/MediaCapturer_nopin_signed.apk" "$DEST/"
-cp "$ARCH/windows-work/analytics-pinning/Analytics_nopin_signed.apk" "$DEST/"
-cp "$ARCH/windows-work/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
+cp "$ARCH/apk-patches/jcm-pinning/JuneCloudMessaging_nopin_signed.apk" "$DEST/"
+cp "$ARCH/apk-patches/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
+cp "$ARCH/apk-patches/mediacapturer-pinning/MediaCapturer_nopin_signed.apk" "$DEST/"
+cp "$ARCH/apk-patches/analytics-pinning/Analytics_nopin_signed.apk" "$DEST/"
+cp "$ARCH/apk-patches/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
 cp "$ARCH/onoven/oven-light/OvenLight_signed.apk" "$DEST/"
 # Chef cook-modes patch (optional). Built from the user's own stock Chef APK
-# with windows-work/chef-cookmodes/build_patched.sh; June's assets are not
+# with apk-patches/chef-cookmodes/build_patched.sh; June's assets are not
 # published. Without it the oven keeps the stock primitive whitelist.
-CHEF_APK="$ARCH/windows-work/chef-cookmodes/Chef_cookmodes_signed.apk"
+CHEF_APK="$ARCH/apk-patches/chef-cookmodes/Chef_cookmodes_signed.apk"
 if [ -f "$CHEF_APK" ]; then
   cp "$CHEF_APK" "$DEST/"
   echo "[*] Chef cook-modes patch included: $(du -h "$CHEF_APK" | cut -f1)"

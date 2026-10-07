@@ -38,8 +38,8 @@ JUNE_LR=/path/to/local-resources JUNE_ROOT=/path/to/June ./prepare_assets.sh
 | `companions_state.json` | repo root (supplied blob) | yes |
 | `boot_junelocal_init.img` | `tools/orchestrator/` | no; publish `build_boot_junelocal_init.py` + `jcm_apply.sh` and build it |
 | `JuneCloudMessaging.apk` | `june-rcm/healthy-build/…` | **no** (June proprietary) |
-| `JuneCloudMessaging_nopin_signed.apk` | `windows-work/jcm-pinning/` | **no** (modified June app) |
-| `companion_endpoint_signed.apk` | `windows-work/companion-endpoint/` | **no** |
+| `JuneCloudMessaging_nopin_signed.apk` | `apk-patches/jcm-pinning/` | **no** (modified June app) |
+| `companion_endpoint_signed.apk` | `apk-patches/companion-endpoint/` | **no** |
 | `junelife_chain_godaddy_intermediate.crt`, `june-local.key` | `June/tools/certs/` | **no** — contains June's private key |
 | `tegrarcm`, `jetson-tk1.bct`, `u-boot-dtb-tegra.bin` | `june-rcm/` | no (June/NVIDIA firmware) |
 | `upstream-content/` (presets/recipes mirror, ~287 MB) | `upstream-content/` (or `JUNE_CONTENT_DIR`) | **no** — June/third-party content, reference only |

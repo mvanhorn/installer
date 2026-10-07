@@ -69,8 +69,8 @@ process at startup. The installer stages the helper at
 JCM/Remotes:
 
 - **Custom/per-home CA installs** stage the no-pin `MediaCapturer` and
-  `Analytics` APKs (recipes in `windows-work/mediacapturer-pinning/` and
-  `windows-work/analytics-pinning/`), so cook-time stills and analytics reach
+  `Analytics` APKs (recipes in `apk-patches/mediacapturer-pinning/` and
+  `apk-patches/analytics-pinning/`), so cook-time stills and analytics reach
   june-local.
 - **Basic/prepackaged installs** keep the factory apps and the GoDaddy chain,
   which the factory pins accept. The camera fallback still produces live view
