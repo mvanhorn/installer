@@ -1,6 +1,6 @@
 # June Local installer mockups
 
-Rendered from the real installer UI (version 0.5, build 20261006-0256-83d0fced).
+Rendered from the real installer UI (version 0.5, build 20261007-0044-5fd2bf5c).
 
 | File | Stage | What it shows |
 | --- | --- | --- |

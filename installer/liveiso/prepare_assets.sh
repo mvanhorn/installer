@@ -1117,12 +1117,45 @@ if [ "$MODE" = "ventoy-dir" ]; then
   exit 1
 fi
 
+sanitize_folder() {
+  local raw="${1:-}" part out="" parts=()
+  raw="${raw//\\//}"
+  IFS='/' read -r -a parts <<< "$raw"
+  for part in "${parts[@]}"; do
+    part="${part#"${part%%[![:space:]]*}"}"
+    part="${part%"${part##*[![:space:]]}"}"
+    part="${part%"${part##*[!.]}"}"
+    part="${part%"${part##*[![:space:]]}"}"
+    [ -n "$part" ] || continue
+    [ "$part" = "." ] && continue
+    [ "$part" = ".." ] && continue
+    out="${out:+$out/}$part"
+  done
+  printf '%s\n' "$out"
+}
+
+sanitize_filename() {
+  local raw="${1:-}"
+  raw="${raw//\\//}"
+  raw="${raw##*/}"
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  raw="${raw%"${raw##*[!.]}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  case "${raw,,}" in
+    ""|*.img|*.raw) ;;
+    *) raw="$raw.img" ;;
+  esac
+  printf '%s\n' "$raw"
+}
+
 # images DEST [FOLDER]: list restorable images as "<path>\t<bytes>" so a UI
 # can let the user pick one (restore otherwise takes the first it finds).
 if [ "$MODE" = "images" ]; then
+  folder_arg="$(sanitize_folder "${3:-}")"
   dest="$(resolve_explicit_destination "${2:-}")" || exit 1
   root="${dest#*$'\t'}"
-  [ -n "${3:-}" ] && root="$root/$3"
+  [ -n "$folder_arg" ] && root="$root/$folder_arg"
   find "$root" -maxdepth 1 -type f \( -name '*.img' -o -name '*.raw' \) -printf '%p\t%s\n' 2>/dev/null | sort
   exit 0
 fi
@@ -1134,8 +1167,8 @@ fi
 wait_for_ums
 JUNE_DISK="$DEV"
 DEST_ARG="${2:-}"
-FOLDER_ARG="${3:-}"
-FILENAME_ARG="${4:-}"
+FOLDER_ARG="$(sanitize_folder "${3:-}")"
+FILENAME_ARG="$(sanitize_filename "${4:-}")"
 
 unique_backup_name() {
   local dir="$1" name="$2" base ext n cand

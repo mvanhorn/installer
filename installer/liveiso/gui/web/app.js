@@ -265,7 +265,7 @@ function viewOptions() {
       ${ui.destErr ? `<div class="err">${MARK.warn}<span>${esc(ui.destErr)}</span></div>` : ""}
       <div class="row"><button class="btn ghost" type="button" data-do="rescan">Rescan drives</button></div>
       <div class="fields">
-        <div class="field${restore ? " wide" : ""}"><label for="f-folder">Folder (optional)</label><input id="f-folder" name="folder" autocomplete="off" spellcheck="false" placeholder="${restore ? "Leave empty for the top level" : "june-backups"}" value="${esc(f.folder || "")}"></div>
+        <div class="field${restore ? " wide" : ""}"><label for="f-folder">${restore ? "Folder (optional)" : "Folder"}</label><input id="f-folder" name="folder" autocomplete="off" spellcheck="false" placeholder="${restore ? "Leave empty for the top level" : "june-backups"}" value="${esc(f.folder || "")}"><div class="hint">${restore ? "Subfolder to search; / and \\\\ both work." : "Saved to this folder on the drive; / and \\\\ both work. Clear it for the top level."}</div></div>
         ${restore ? "" : `<div class="field"><label for="f-file">File name</label><input id="f-file" name="filename" autocomplete="off" spellcheck="false" value="${esc(f.filename || defaultFilename())}"></div>`}
       </div>`;
     if (restore) {
@@ -678,7 +678,11 @@ function bindView(root) {
 }
 
 function startFlow(action) {
-  setView("options", { action, form: {}, dests: null, images: null, destErr: "" });
+  // Backups get a real default folder, not just a placeholder, so the common
+  // case is one keypress away.  Clearing the field still saves at top level.
+  const form = {};
+  if (action === "backup") form.folder = "june-backups";
+  setView("options", { action, form, dests: null, images: null, destErr: "" });
   if (action === "backup" || action === "restore") loadDests();
 }
 

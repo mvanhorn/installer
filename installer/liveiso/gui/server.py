@@ -521,11 +521,7 @@ class App:
             folder = self._clean_folder(str(body.get("folder", "")))
             params.update(dest=dest, folder=folder)
             if action == "backup":
-                filename = str(body.get("filename", "")).strip() or time.strftime("%y%m%d-%H%M.img")
-                if not filename.endswith(".img"):
-                    filename += ".img"
-                if not SAFE_PART_RE.match(filename):
-                    raise ApiError(400, "Use only letters, digits, dots, dashes and spaces in the file name.")
+                filename = self._clean_filename(str(body.get("filename", "")))
                 params["filename"] = filename
                 argv = self.worker("backup.sh") + ["backup", dest, folder, filename]
             else:
@@ -550,13 +546,42 @@ class App:
 
     @staticmethod
     def _clean_folder(folder: str) -> str:
-        folder = folder.strip().strip("/")
-        if not folder:
-            return ""
-        parts = folder.split("/")
-        if any(p in ("", ".", "..") or not SAFE_PART_RE.match(p) for p in parts):
-            raise ApiError(400, "Use a simple folder name (letters, digits, dots, dashes, spaces).")
-        return folder
+        """Normalise a folder typed on any platform.
+
+        Both separators mean the same thing: "backups\\2026" and
+        "backups/2026" are the nested folder backups/2026.  Empty and parent
+        segments are dropped, so the result always stays inside the drive.
+        """
+        raw = (folder or "").replace("\\", "/")
+        parts = []
+        for part in raw.split("/"):
+            part = part.strip().rstrip(".").strip()
+            if not part or part in (".", ".."):
+                continue
+            if not SAFE_PART_RE.match(part):
+                raise ApiError(400, "Use simple folder names (letters, digits, dots, dashes, spaces).")
+            parts.append(part)
+        if len(parts) > 4:
+            raise ApiError(400, "Use at most four folder levels.")
+        return "/".join(parts)
+
+    @staticmethod
+    def _clean_filename(filename: str) -> str:
+        """Take the last path component and make sure it ends in .img.
+
+        People paste paths like "june-backups\\261007-1200.img" or
+        "backups/261007-1200.img" into the name field; both separators are
+        accepted and only the file name is kept.
+        """
+        name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+        name = name.strip().rstrip(".").strip()
+        if not name:
+            name = time.strftime("%y%m%d-%H%M.img")
+        if not name.lower().endswith(".img"):
+            name += ".img"
+        if not SAFE_PART_RE.match(name):
+            raise ApiError(400, "Use only letters, digits, dots, dashes and spaces in the file name.")
+        return name
 
     def destinations(self) -> dict:
         if self.mock:
