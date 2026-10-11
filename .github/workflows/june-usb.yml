@@ -80,26 +80,37 @@ jobs:
         with:
           name: June-USB-windows-unsigned
           path: dist
-      - name: Azure login
-        uses: azure/login@v3
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # This repository only allows GitHub's own actions, so log in and sign
+      # with the runner's Azure CLI and Microsoft's TrustedSigning module
+      # instead of azure/login and azure/artifact-signing-action.
+      - name: Azure login (OIDC)
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          $req = "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange"
+          $token = (Invoke-RestMethod -Uri $req -Headers @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }).value
+          az login --service-principal -u $env:AZURE_CLIENT_ID --tenant $env:AZURE_TENANT_ID --federated-token $token --allow-no-subscriptions --output none
+          if ($LASTEXITCODE) { throw "az login failed" }
+          az account set --subscription $env:AZURE_SUBSCRIPTION_ID
       - name: Sign with Azure Artifact Signing
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
-          files: ${{ github.workspace }}\dist\June-USB.exe
-          file-digest: SHA256
+        shell: pwsh
+        run: |
+          Install-Module -Name TrustedSigning -Scope CurrentUser -Force -AcceptLicense
           # The timestamp keeps the signature valid after the short-lived
           # certificate (and any paused subscription) expires.
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-          description: June USB
-          description-url: https://project-july.org/setup
+          Invoke-TrustedSigning `
+            -Endpoint '${{ vars.AZURE_SIGNING_ENDPOINT }}' `
+            -CodeSigningAccountName '${{ vars.AZURE_SIGNING_ACCOUNT }}' `
+            -CertificateProfileName '${{ vars.AZURE_SIGNING_PROFILE }}' `
+            -Files "$env:GITHUB_WORKSPACE\dist\June-USB.exe" `
+            -FileDigest SHA256 -TimestampRfc3161 http://timestamp.acs.microsoft.com -TimestampDigest SHA256 `
+            -Description 'June USB' -DescriptionUrl 'https://project-july.org/setup' `
+            -ExcludeEnvironmentCredential -ExcludeManagedIdentityCredential -ExcludeSharedTokenCacheCredential `
+            -ExcludeVisualStudioCredential -ExcludeVisualStudioCodeCredential -ExcludeAzurePowerShellCredential `
+            -ExcludeInteractiveBrowserCredential
       - name: Check signature
         shell: pwsh
         run: |
@@ -184,10 +195,10 @@ jobs:
           path: dist
           merge-multiple: true
       - run: cd dist && sha256sum June-USB.exe June-USB.dmg > SHA256SUMS && cat SHA256SUMS
-      - uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: |
-            dist/June-USB.exe
-            dist/June-USB.dmg
-            dist/SHA256SUMS
+      - name: Draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "June USB ${GITHUB_REF_NAME#usb-}" --notes "Signed builds of June USB. See installer/usbtool/SIGNING.md." \
+            dist/June-USB.exe dist/June-USB.dmg dist/SHA256SUMS
