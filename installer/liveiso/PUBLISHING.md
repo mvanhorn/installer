@@ -96,12 +96,25 @@ the text menu, and every install/backup log.
 
    Serve it with a short cache lifetime (e.g. `Cache-Control: max-age=300`).
 
+   `installer/releases.json` lists every published version the same way, plus
+   its publish date, newest first and one version per line:
+
+   ```json
+   {"releases": [
+   {"version": "v0.6", "url": "…/installer/v0.6/june-local-live.iso", "sha256": "…", "size": 1413529600, "date": "2026-10-11"},
+   {"version": "v0.5", "url": "…/installer/v0.5/june-local-live.iso", "sha256": "…", "size": 1406533632, "date": "2026-10-10"}
+   ]}
+   ```
+
+   Each version also has `installer/VERSION/june-local-live.iso.sha256`.
+
 `./publish_release.sh v0.6 june-local-live.iso` does steps 3, 4 and 6 in one go
-with the `r2` rclone remote: it hashes the ISO, uploads it (refusing to
-overwrite a published version), checks the public URL serves the same size,
-then writes `latest.json`. `--manifest-only` writes just `latest.json` for an
-ISO that is already uploaded; `--dry-run` shows what it would do. Step 5 (the
-redirect rule) stays manual.
+with the `r2` rclone remote: it hashes the ISO, uploads it with its `.sha256`
+(refusing to overwrite a published version), checks the public URL serves the
+same size, then writes `latest.json` and adds the version to `releases.json`.
+`--manifest-only` writes just the two manifests for an ISO that is already
+uploaded; `--dry-run` shows what it would do. Step 5 (the redirect rule) stays
+manual.
 7. Update the SHA256 on the website and in `CREATE_VENTOY_USB.md`.
 
 Builds from this version on also carry `/boot/grub/june-bios.img` (legacy

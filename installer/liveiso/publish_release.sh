@@ -9,11 +9,12 @@
 #   installer/VERSION/june-local-live.iso         the ISO (never overwritten)
 #   installer/VERSION/june-local-live.iso.sha256  its checksum
 #   installer/latest.json                          what June USB downloads
+#   installer/releases.json                        every published version, newest first
 #
 # Usage:
-#   publish_release.sh VERSION ISO                  upload ISO, then latest.json
+#   publish_release.sh VERSION ISO                  upload ISO, then the manifests
 #   publish_release.sh VERSION ISO --manifest-only  ISO already uploaded: only
-#                                                   write latest.json for it
+#                                                   write the manifests for it
 #   add --dry-run to print what would happen without uploading.
 #
 # The https://downloads.project-july.org/installer/latest redirect is a
@@ -21,7 +22,7 @@
 # (see PUBLISHING.md).
 set -euo pipefail
 
-usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 [ $# -ge 2 ] || usage
 version="$1"
 iso="$2"
@@ -103,6 +104,33 @@ if [ "$dry" = 0 ]; then
     echo "Uploaded, but $public/latest.json does not show the new hash yet (cache?). Check it by hand." >&2
   fi
 fi
+
+# releases.json has one line per version, newest first, so it can be edited
+# without jq. A re-published version moves to the top and keeps its date.
+if rclone lsf "$remote/installer/" --files-only | grep -qx releases.json; then
+  rclone cat "$remote/installer/releases.json" > "$work/releases.old"
+  grep -q '^{"version": ' "$work/releases.old" || {
+    echo "installer/releases.json on R2 lists no versions; not overwriting it." >&2
+    exit 1
+  }
+else
+  : > "$work/releases.old"
+fi
+published="$(grep -F "{\"version\": \"$version\"," "$work/releases.old" | sed -n 's/.*"date": "\([0-9-]*\)".*/\1/p' | head -1 || true)"
+[ -n "$published" ] || published="$(date -u +%Y-%m-%d)"
+{
+  echo '{"releases": ['
+  {
+    printf '{"version": "%s", "url": "%s/%s/%s", "sha256": "%s", "size": %s, "date": "%s"}\n' \
+      "$version" "$public" "$version" "$name" "$sha" "$size" "$published"
+    grep '^{"version": ' "$work/releases.old" | grep -vF "{\"version\": \"$version\"," | sed 's/,$//' || true
+  } | sed '$!s/$/,/'
+  echo ']}'
+} > "$work/releases.json"
+echo "releases.json:"
+cat "$work/releases.json"
+run rclone copyto "$work/releases.json" "$remote/installer/releases.json" \
+  --header-upload "Content-Type: application/json" --header-upload "Cache-Control: public, max-age=300"
 echo
 echo "Remaining by hand: point the $public/latest redirect rule at $version, and update the"
 echo "SHA256 on the website and in CREATE_VENTOY_USB.md."
