@@ -370,6 +370,29 @@ func TestCameraViewPage(t *testing.T) {
 	}
 }
 
+func TestAssociatedListsEveryCompanion(t *testing.T) {
+	hub := newHub(true, "")
+	hub.setOvenID("oven-1")
+	hub.mu.Lock()
+	hub.companionsInfo["phone-a"] = CompanionInfo{Name: "Phone A", Platform: "ios"}
+	hub.companionsInfo["phone-b"] = CompanionInfo{Name: "Phone B", Platform: "android"}
+	hub.mu.Unlock()
+	// The newest pairing must not hide the companion that paired first: the
+	// oven reads its trusted roster from this response at boot.
+	hub.associate("oven-1", "phone-b")
+
+	req := httptest.NewRequest(http.MethodGet, "/2/devices/oven-1/associated", nil)
+	rec := httptest.NewRecorder()
+	handleREST(hub, &Config{}, rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("associated status = %d", rec.Code)
+	}
+	body := rec.Body.Bytes()
+	if !bytes.Contains(body, []byte("phone-a")) || !bytes.Contains(body, []byte("phone-b")) {
+		t.Fatalf("associated roster hides a paired companion: %s", body)
+	}
+}
+
 func TestCatalogGETRoute(t *testing.T) {
 	dir := t.TempDir()
 	catalog := `{"hierarchies":[],"presets":[{"content_id":"bake","url":"https://api.junelife.com/1/presets/bundle/cook_preset/bake/x.jcpb"}],"version":2}`

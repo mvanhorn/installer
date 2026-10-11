@@ -357,11 +357,15 @@ func handleREST(hub *Hub, cfg *Config, w http.ResponseWriter, r *http.Request) {
 		var devices []map[string]any
 		hub.mu.Lock()
 		if requester == hub.ovenID {
-			assoc := hub.associations[hub.ovenID]
+			// The oven loads its trusted-companion roster from this response
+			// at every boot, so it must list every companion.  Keeping only
+			// the last association (the phone that paired most recently)
+			// hides the others and the oven then rejects them with "No
+			// paired companion found"; pairing a second phone on 2026-10-11
+			// left HA and every other phone locked out after the next
+			// reboot.  hub.associations still records the last link for
+			// reference, but it no longer filters this list.
 			for cid, info := range hub.companionsInfo {
-				if assoc != "" && cid != assoc {
-					continue
-				}
 				name := info.Name
 				if name == "" {
 					name = "companion"
