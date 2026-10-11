@@ -598,7 +598,7 @@ class App:
                 if len(fields) < 4 or not fields[0]:
                     continue
                 origin = fields[3]
-                if "Ventoy" in fields[1]:
+                if "(current boot USB)" in fields[1]:
                     origin = "boot"
                 try:
                     free = int(fields[2])
@@ -608,7 +608,7 @@ class App:
             if not any(i["origin"] == "boot" for i in items):
                 ventoy = self._run_backup_query(["ventoy-dir"]).strip()
                 if ventoy:
-                    items.append({"tag": ventoy, "label": "Ventoy (current boot USB)", "free": 0, "origin": "boot"})
+                    items.append({"tag": ventoy, "label": "USB boot stick (current boot USB)", "free": 0, "origin": "boot"})
         with self.lock:
             self.allowed_dests = {i["tag"] for i in items}
         return {"items": items}

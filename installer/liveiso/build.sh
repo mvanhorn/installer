@@ -401,7 +401,7 @@ choose_destination() {
         choice="$(whiptail --title "Backup destination" \
           --menu "This live system runs from RAM. If the boot USB does not have enough storage, you can safely remove it now and plug in another USB drive, then choose Refresh.\n\n${reasons:+Details:\n$reasons\n\n}Select where to save the backup image:" \
           22 78 3 \
-          "$ventoy_mnt" "Boot USB stick (Ventoy) - current boot medium" \
+          "$ventoy_mnt" "Boot USB stick - current boot medium" \
           "refresh" "Rescan connected drives" \
           "back" "Back to main menu" 3>&1 1>&2 2>&3)" || return 1
         [ "$choice" = "back" ] && return 1
@@ -424,10 +424,10 @@ choose_destination() {
       args+=("$tag" "$desc")
     done <<< "$list"
     case "$list" in
-      *"Ventoy (current boot USB)"*) ;;
+      *"(current boot USB)"*) ;;
       *)
         if [ -n "$ventoy_mnt" ]; then
-          args+=("$ventoy_mnt" "Boot USB stick (Ventoy) - current boot medium")
+          args+=("$ventoy_mnt" "Boot USB stick - current boot medium")
         fi
         ;;
     esac
@@ -753,7 +753,7 @@ else
       ;;
     3)
       echo "Connect the oven, hold SW2, and power it on."
-      echo "Use a spare USB drive, or the boot USB if it has a writable data partition (Ventoy)."
+      echo "Use a spare USB drive, or the boot USB if it has a writable data partition (JUNE or Ventoy)."
       echo "Connection guide: $GUIDE_URL"
       read -rp "Press Enter when the oven is in RCM mode: "
       if run_backup backup; then
@@ -890,12 +890,15 @@ else
     font=$prefix/unicode.pf2
 fi
 
-# Copied from the netinst image
+# Copied from the netinst image.  The same config also runs under legacy
+# BIOS GRUB on June USB sticks, which has no efi_* modules.
 if loadfont $font ; then
     set gfxmode=800x600
     set gfxpayload=keep
-    insmod efi_gop
-    insmod efi_uga
+    if [ "$grub_platform" = efi ]; then
+        insmod efi_gop
+        insmod efi_uga
+    fi
     insmod video_bochs
     insmod video_cirrus
 else
@@ -920,6 +923,13 @@ default vesamenu.c32
 prompt 0
 timeout 30
 EOF
+
+# June USB sticks (installer/usbtool) copy the ISO's files onto FAT32.  Give
+# them the legacy BIOS boot code (built from this container's GRUB, so it
+# matches the i386-pc modules beside it) and the release name.
+mkdir -p config/includes.binary/boot/grub
+bash /build/make_bios_boot.sh config/includes.binary/boot/grub
+echo "$JUNE_VERSION" > config/includes.binary/june-version.txt
 
 lb build
 

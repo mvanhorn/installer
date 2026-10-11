@@ -641,7 +641,7 @@ ventoy_data_partition() {
     [ -b "$part" ] || continue
     fstype="$(lsblk -rno FSTYPE "$part" 2>/dev/null | head -n1)"
     label="$(lsblk -rno LABEL "$part" 2>/dev/null | head -n1)"
-    case "${label,,}" in ventoy) ;; *) continue ;; esac
+    case "${label,,}" in ventoy|june) ;; *) continue ;; esac
     case "${fstype,,}" in
       exfat|ntfs|ext4) ;;
       *)
@@ -756,7 +756,7 @@ list_destinations() {
       exfat|ntfs|ext4) ;;
       *)
         case "${label,,}" in
-          ventoy) echo "[diag] $dev ($label): '${fstype:-unknown}' cannot hold a >4 GB image." >&2 ;;
+          ventoy|june) echo "[diag] $dev ($label): '${fstype:-unknown}' cannot hold a >4 GB image." >&2 ;;
         esac
         continue
         ;;
@@ -772,8 +772,13 @@ list_destinations() {
     fi
     mounted_here=0
     case "${label,,}" in
-      ventoy)
-        label="Ventoy (current boot USB)"
+      ventoy|june)
+        # JUNE is the data partition of a stick made by June USB
+        # (installer/usbtool); Ventoy sticks keep working.
+        case "${label,,}" in
+          june) label="June USB (current boot USB)" ;;
+          *) label="Ventoy (current boot USB)" ;;
+        esac
         ventoy_line="$(ventoy_data_partition || true)"
         if [ -n "$ventoy_line" ]; then
           mnt="${ventoy_line#*$'\t'}"
