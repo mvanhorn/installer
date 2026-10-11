@@ -26,19 +26,27 @@ Download June USB for
 On Windows it asks for administrator permission, which it needs to partition
 the stick. It needs no installation and no Ventoy.
 
-> **The first releases aren't code-signed yet.** On Windows, "Windows protected
-> your PC" appears: choose **More info → Run anyway**. On a Mac, open the disk
-> image, drag June USB to Applications and open it; when macOS refuses, go to
-> **System Settings → Privacy & Security** and choose **Open Anyway**. The Mac
-> version is new and less tested than the Windows one; if it gives you trouble,
-> use Ventoy on another computer for now.
+> **Windows:** June USB is signed by its publisher, Felix Nenz. While the
+> release is new, Windows may still show "Windows protected your PC": choose
+> **More info**, check that it says **Publisher: Felix Nenz**, then **Run
+> anyway**. If it names another publisher or none, don't run it.
+>
+> **Mac:** the Mac version isn't signed yet. Open the disk image, drag June USB
+> to Applications and open it; when macOS refuses, go to **System Settings →
+> Privacy & Security** and choose **Open Anyway**. The Mac version is new and
+> less tested than the Windows one; if it gives you trouble, use Ventoy on
+> another computer for now.
 
 ### 1. Get the installer
 
 June USB checks the download site for the current installer. Press
 **Download and continue**: it downloads `june-local-live.iso` (about 1.4 GB)
 and checks its SHA-256 itself, so there's nothing to verify by hand. A copy it
-downloaded before is reused.
+downloaded before is reused, and a download that stopped continues where it
+left off.
+
+The latest version is preselected. If it gives you trouble, **Older versions**
+offers the two before it.
 
 ![June USB: Get the installer. June Local v0.5, 1.4 GB, from downloads.project-july.org, checked with SHA256. Buttons: Download and continue, Use an ISO file I already have.](website-assets/screenshots/june-usb/01-get-installer.png)
 
