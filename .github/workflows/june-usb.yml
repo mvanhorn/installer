@@ -1,0 +1,193 @@
+# Builds June USB (installer/usbtool) for Windows and macOS.
+#
+# Every push/PR that touches the tool is built and tested unsigned.  A tag
+# "usb-vX.Y.Z" additionally signs (when the secrets below exist) and attaches
+# the files to a draft GitHub release.  See installer/usbtool/SIGNING.md.
+#
+# Windows (Azure Artifact Signing, OIDC, no stored keys):
+#   secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   vars    AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT, AZURE_SIGNING_PROFILE
+# macOS (Developer ID + notarization):
+#   secrets MAC_CERT_P12_BASE64, MAC_CERT_PASSWORD, MAC_SIGNING_IDENTITY,
+#           APPLE_API_KEY_P8_BASE64, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID
+name: June USB
+
+on:
+  push:
+    tags: ["usb-v*"]
+    paths: ["installer/usbtool/**", ".github/workflows/june-usb.yml"]
+  pull_request:
+    paths: ["installer/usbtool/**", ".github/workflows/june-usb.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WAILS_VERSION: v2.16.0
+  # Tags give the release version; other builds are marked as dev builds.
+  TOOL_VERSION: ${{ startsWith(github.ref, 'refs/tags/usb-v') && github.ref_name || format('dev-{0}', github.sha) }}
+
+defaults:
+  run:
+    working-directory: installer/usbtool
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: installer/usbtool/go.mod
+          cache-dependency-path: installer/usbtool/go.sum
+      - run: go vet ./stick ./cmd/...
+      - run: go test ./stick
+      - run: GOOS=windows go vet . ./stick && GOOS=darwin go vet ./stick
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: installer/usbtool/go.mod
+          cache-dependency-path: installer/usbtool/go.sum
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      - name: Build
+        run: wails build -platform windows/amd64 -skipbindings -trimpath -ldflags "-X june-usb/stick.ToolVersion=${{ env.TOOL_VERSION }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: June-USB-windows-unsigned
+          path: installer/usbtool/build/bin/June-USB.exe
+
+  # Separate job so only tag builds touch the "release" environment, whose
+  # name is what the Azure federated credential trusts.
+  sign-windows:
+    if: startsWith(github.ref, 'refs/tags/usb-v') && vars.AZURE_SIGNING_ACCOUNT != ''
+    needs: windows
+    runs-on: windows-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure OIDC login
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: June-USB-windows-unsigned
+          path: dist
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign with Azure Artifact Signing
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\dist\June-USB.exe
+          file-digest: SHA256
+          # The timestamp keeps the signature valid after the short-lived
+          # certificate (and any paused subscription) expires.
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: June USB
+          description-url: https://project-july.org/setup
+      - name: Check signature
+        shell: pwsh
+        run: |
+          $s = Get-AuthenticodeSignature dist\June-USB.exe
+          if ($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate) { throw "signature: $($s.Status), timestamp: $($s.TimeStamperCertificate)" }
+          $s.SignerCertificate.Subject
+      - uses: actions/upload-artifact@v4
+        with:
+          name: June-USB-windows
+          path: dist/June-USB.exe
+
+  macos:
+    needs: test
+    runs-on: macos-latest
+    env:
+      CAN_SIGN: ${{ startsWith(github.ref, 'refs/tags/usb-v') }}
+      HAS_CERT: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: installer/usbtool/go.mod
+          cache-dependency-path: installer/usbtool/go.sum
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      - name: Build
+        run: wails build -platform darwin/universal -skipbindings -trimpath -ldflags "-X june-usb/stick.ToolVersion=${{ env.TOOL_VERSION }}"
+      - name: Sign
+        if: env.CAN_SIGN == 'true' && env.HAS_CERT == 'true'
+        env:
+          P12: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"; kcpw="$(uuidgen)"
+          security create-keychain -p "$kcpw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kcpw" "$kc"
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" build/bin/June-USB.app
+          codesign --verify --deep --strict --verbose=2 build/bin/June-USB.app
+      - name: Disk image
+        run: |
+          mkdir -p dmg && cp -R build/bin/June-USB.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "June USB" -srcfolder dmg -ov -format UDZO build/bin/June-USB.dmg
+      - name: Notarize
+        if: env.CAN_SIGN == 'true' && env.HAS_CERT == 'true'
+        env:
+          KEY: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+          IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --timestamp --sign "$IDENTITY" build/bin/June-USB.dmg
+          echo "$KEY" | base64 --decode > "$RUNNER_TEMP/key.p8"
+          xcrun notarytool submit build/bin/June-USB.dmg --key "$RUNNER_TEMP/key.p8" --key-id "$KEY_ID" --issuer "$ISSUER" --wait
+          xcrun stapler staple build/bin/June-USB.dmg
+          spctl --assess --type open --context context:primary-signature -v build/bin/June-USB.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: June-USB-macos
+          path: installer/usbtool/build/bin/June-USB.dmg
+
+  # Releases are signed releases: without the Windows signing setup this job
+  # is skipped, and the unsigned builds stay available as run artifacts.
+  release:
+    if: startsWith(github.ref, 'refs/tags/usb-v')
+    needs: [sign-windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: June-USB-{windows,macos}
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum June-USB.exe June-USB.dmg > SHA256SUMS && cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            dist/June-USB.exe
+            dist/June-USB.dmg
+            dist/SHA256SUMS

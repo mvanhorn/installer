@@ -1,0 +1,44 @@
+/* June USB: additions to the installer's app.css ("Still Glass"). */
+
+/* A desktop window, not the oven's kiosk: keep the page from bouncing. */
+html, body { overflow: hidden; }
+.app { height: 100%; }
+.main { overflow: auto; }
+body { -webkit-user-select: none; user-select: none; cursor: default; }
+.logbox, .sel-text { -webkit-user-select: text; user-select: text; }
+
+/* The release card on the first screen. */
+.rel { display: flex; align-items: center; gap: 16px; }
+.rel-icon { flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+  background: radial-gradient(120% 75% at 50% 100%, var(--tGlow), transparent 62%), linear-gradient(180deg, var(--tA), var(--tB));
+  box-shadow: inset 0 0 0 1px var(--tRim); color: var(--glyph); }
+.rel-icon svg { width: 30px; height: 30px; }
+.rel-main { flex: 1; min-width: 0; }
+.rel-title { font: 500 21px/1.2 var(--f); }
+.rel-sub { font: 400 15px/1.35 var(--f); color: var(--fg2); margin-top: 2px; overflow-wrap: anywhere; }
+.rel-prog { margin-top: 16px; }
+.rel-prog .facts { min-height: 0; margin-top: 10px; font-size: 15px; }
+
+/* Drive rows: the option rows with a USB glyph. */
+.opt .drv-icon { flex: none; width: 26px; height: 26px; color: var(--uGlyph); margin-top: 1px; }
+.opt.sel .drv-icon { color: var(--glyph); }
+.opt.off { opacity: .5; cursor: default; }
+.opt.off:hover { box-shadow: inset 0 0 0 1px var(--line); }
+.waiting { display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); margin: 18px 0; }
+.waiting .mark { width: 30px; height: 30px; }
+
+/* Stick layout preview on the confirm screen. */
+.layout { display: flex; gap: 8px; margin: 18px 0 6px; height: 64px; }
+.layout div { border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.layout b { font: 600 15px/1.2 var(--f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layout span { font: 400 13px/1.3 var(--f); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layout .lb { flex: 0 0 30%; box-shadow: inset 0 0 0 1px var(--tRim); background: linear-gradient(180deg, var(--tA), var(--tB)); }
+.layout .ld { flex: 1; box-shadow: inset 0 0 0 1px rgba(74,222,128,.45); background: rgba(74,222,128,.06); }
+
+.done-list { list-style: none; counter-reset: s; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.done-list li { counter-increment: s; display: flex; gap: 12px; font: 400 17px/1.4 var(--f); }
+.done-list li::before { content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 14px/1 var(--f); box-shadow: inset 0 0 0 1.5px var(--ember); color: var(--ember2); margin-top: -1px; }
+
+.eyebrow .mark { width: 20px; height: 20px; }
+
+.foot { margin-top: 32px; font: 400 13px/1.4 var(--f); color: var(--fg2); }

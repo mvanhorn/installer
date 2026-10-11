@@ -1,0 +1,3 @@
+# Wails build output and its generated JS helpers (the app does not use them)
+build/bin/
+frontend/wailsjs/
