@@ -4,9 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SRC="${1:-${ANALYTICS_SRC:-/home/fng/nas2/gene/Programming/June/local-resources/june-rcm/healthy-build/system_app_dump/Analytics/Analytics.apk}}"
-APKTOOL="${APKTOOL:-/home/fng/.local/bin/apktool}"
-KS="${KS:-/home/fng/nas2/gene/Programming/June/tools/certs/june_apk_sign.p12}"
+SRC="${1:-${ANALYTICS_SRC:?usage: build_nopin.sh /path/to/Analytics.apk}}"
+APKTOOL="${APKTOOL:-apktool}"
+KS="${KS:-june_apk_sign.p12}"
 
 rm -rf decoded
 "$APKTOOL" d -f -o decoded "$SRC"

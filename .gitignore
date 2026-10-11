@@ -26,3 +26,8 @@ golocal/bin/
 
 # CIFS silly-rename artifacts (files deleted while still open on the NAS)
 .__smbfile*
+
+# Python caches and virtualenvs
+__pycache__/
+*.pyc
+.venv/

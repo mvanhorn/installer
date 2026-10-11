@@ -18,7 +18,7 @@ JUNE_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 STOCK="${1:-$JUNE_ROOT/local-resources/june-rcm/healthy-build/decompiled/priv-app-apks/Chef.apk}"
 OUT="${2:-$SCRIPT_DIR/Chef_cookmodes_signed.apk}"
 
-APKTOOL="${APKTOOL:-/home/fng/.local/bin/apktool}"
+APKTOOL="${APKTOOL:-apktool}"
 KS="${KS:-$JUNE_ROOT/tools/certs/june_apk_sign.p12}"
 KS_PASS="${KS_PASS:-june}"
 KS_ALIAS="${KS_ALIAS:-june}"

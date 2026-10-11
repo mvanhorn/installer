@@ -2,8 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APKTOOL="${APKTOOL:-/home/fng/.local/bin/apktool}"
-KS="${KS:-/home/fng/nas2/gene/Programming/June/tools/certs/june_apk_sign.p12}"
+APKTOOL="${APKTOOL:-apktool}"
+KS="${KS:-june_apk_sign.p12}"
 
 "$APKTOOL" b . -o OvenLight_unsigned.apk
 jarsigner -keystore "$KS" -storetype PKCS12 -storepass june \

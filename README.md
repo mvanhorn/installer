@@ -6,10 +6,17 @@ It flashes the oven over USB (RCM/UMS), installs the local service and
 certificates, optionally generates a per-home CA, and can back up or restore
 the oven's eMMC.
 
-This repository is the publishable subset of the development tree. Proprietary
-June blobs, firmware and private keys are **not** included; see
-`installer/liveiso/PUBLISHING.md` for the full input list and what
-must be supplied locally.
+> **Beta (0.6).** The installer is ready for testers. Make a backup of the
+> oven first: the installer can restore it if anything goes wrong. Report how
+> it went in [issues](https://github.com/prj-july/installer/issues) or at
+> <hello@project-july.org>. The step-by-step guide is at
+> <https://project-july.org/installer/>.
+
+Project July is an independent community project, not affiliated with or
+endorsed by June Life or Weber (see [`NOTICE.md`](NOTICE.md)). June's APKs,
+firmware and private keys are **not** included in this repository; see
+[`installer/liveiso/PUBLISHING.md`](installer/liveiso/PUBLISHING.md) for the full
+input list and what must be supplied locally.
 
 ## Make the installer USB stick
 
@@ -87,8 +94,8 @@ bash build_live_iso.sh          # writes june-local-live.iso
 `build_live_iso.sh` uses Docker (legacy builder) to run live-build. Put the
 resulting ISO on a stick with June USB (**Use an ISO file I already have**) or
 Ventoy (`flash_to_ventoy.sh`), boot the target machine from it, and follow the
-on-screen menu. `publish_release.sh` uploads a release and its `latest.json`
-(see `installer/liveiso/PUBLISHING.md`).
+on-screen menu. `publish_release.sh` uploads a release and updates
+`latest.json` and `releases.json` (see `installer/liveiso/PUBLISHING.md`).
 
 Remote toast levels and the other non-bake primitives need the optional Chef
 patch. Build it from your own extracted Chef APK with
@@ -105,4 +112,11 @@ the installer leaves the stock Chef whitelist in place.
 - Prebuilt armv7 binaries (`june-local`, `june-camerad`) and the boot image
 - The stock and patched Chef APK (`Chef.apk` / `Chef_cookmodes_signed.apk`)
 
-The recipes rebuild, the patched apps, Keys and blobs.
+The recipes in `apk-patches/` rebuild the patched apps from APKs you extract
+from your own oven; keys and blobs stay on your machine.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE). The bundled Barlow fonts are under the SIL Open
+Font License; [`NOTICE.md`](NOTICE.md) lists third-party components and the
+June trademark notice.
