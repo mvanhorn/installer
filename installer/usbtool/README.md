@@ -80,8 +80,8 @@ On Windows, `JUNE_USB_ALLOW_VHD=1` lists attached VHDs.
 The app reads `https://downloads.project-july.org/installer/latest.json`:
 
 ```json
-{"version": "v0.6", "url": "https://downloads.project-july.org/installer/v0.6/june-local-live.iso",
- "sha256": "119ba2efb9a16336e3932144fa8d25bc6c4713e8aa5738d230d49c93e93e2538", "size": 1413529600}
+{"version": "v0.6.1", "url": "https://downloads.project-july.org/installer/v0.6.1/june-local-live.iso",
+ "sha256": "1cff5bdb3551f4db67d4c2a589bbb453b172af1a303863de85b9dd1710080383", "size": 1413529600}
 ```
 
 `JUNE_USB_MANIFEST` overrides the URL for testing. Without a manifest, users
