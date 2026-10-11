@@ -86,4 +86,24 @@ the text menu, and every install/backup log.
    published version; old versions stay downloadable.
 5. Point the `https://downloads.project-july.org/installer/latest` redirect
    (302) at the new object.
-6. Update the SHA256 on the website and in `CREATE_VENTOY_USB.md`.
+6. Upload `installer/latest.json`, which the June USB app
+   (`installer/usbtool`) reads to download and verify the ISO:
+
+   ```json
+   {"version": "v0.6", "url": "https://downloads.project-july.org/installer/v0.6/june-local-live.iso",
+    "sha256": "<sha256 from step 3>", "size": <bytes>}
+   ```
+
+   Serve it with a short cache lifetime (e.g. `Cache-Control: max-age=300`).
+
+`./publish_release.sh v0.6 june-local-live.iso` does steps 3, 4 and 6 in one go
+with the `r2` rclone remote: it hashes the ISO, uploads it (refusing to
+overwrite a published version), checks the public URL serves the same size,
+then writes `latest.json`. `--manifest-only` writes just `latest.json` for an
+ISO that is already uploaded; `--dry-run` shows what it would do. Step 5 (the
+redirect rule) stays manual.
+7. Update the SHA256 on the website and in `CREATE_VENTOY_USB.md`.
+
+Builds from this version on also carry `/boot/grub/june-bios.img` (legacy
+BIOS boot for June USB sticks, from `make_bios_boot.sh`) and
+`/june-version.txt`.
