@@ -13,7 +13,7 @@ covers the three ways to make that stick:
 
 - A USB stick of **16 GB or more**; 32 GB is recommended. The installer takes
   4 GB, and one oven backup is about 7.3 GB. USB 3 is noticeably faster.
-- A Windows 10/11 PC or a Mac to make the stick, and a laptop to start the
+- A Windows 10/11 PC or a Mac with macOS 13 (Ventura) or later to make the stick, and a laptop to start the
   installer on (it can be the same computer). Macs with Apple chips can make the
   stick but can't start the installer.
 - **Making the stick erases it.** Copy anything you need off it first.

@@ -16,7 +16,7 @@ must be supplied locally.
 The installer runs on a laptop, started from a USB stick of 16 GB or more
 (32 GB recommended). The easiest way to make the stick is **June USB**, a
 small app for [Windows](https://downloads.project-july.org/june-usb/June-USB.exe)
-and [Mac](https://downloads.project-july.org/june-usb/June-USB.dmg). It
+and [Mac](https://downloads.project-july.org/june-usb/June-USB.dmg) (macOS 13 or later). It
 downloads the latest installer, checks its SHA-256, and prepares the stick:
 
 1. **Get the installer**: *Download and continue* (or use an ISO you already have).

@@ -136,7 +136,13 @@ jobs:
           cache-dependency-path: installer/usbtool/go.sum
       - run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
       - name: Build
-        run: wails build -platform darwin/universal -skipbindings -trimpath -ldflags "-X june-usb/stick.ToolVersion=${{ env.TOOL_VERSION }}"
+        env:
+          # Go itself needs macOS 13; say so instead of crashing on older Macs.
+          MACOSX_DEPLOYMENT_TARGET: "13.0"
+        run: |
+          wails build -platform darwin/universal -skipbindings -trimpath -ldflags "-X june-usb/stick.ToolVersion=${{ env.TOOL_VERSION }}"
+          # Wails names the bundle after the display name, "June USB".
+          plutil -replace LSMinimumSystemVersion -string 13.0 "build/bin/June USB.app/Contents/Info.plist"
       - name: Sign
         if: env.CAN_SIGN == 'true' && env.HAS_CERT == 'true'
         env:
@@ -152,11 +158,11 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "$kcpw" "$kc"
           security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
-          codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" build/bin/June-USB.app
-          codesign --verify --deep --strict --verbose=2 build/bin/June-USB.app
+          codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "build/bin/June USB.app"
+          codesign --verify --deep --strict --verbose=2 "build/bin/June USB.app"
       - name: Disk image
         run: |
-          mkdir -p dmg && cp -R build/bin/June-USB.app dmg/
+          mkdir -p dmg && cp -R "build/bin/June USB.app" dmg/
           ln -s /Applications dmg/Applications
           hdiutil create -volname "June USB" -srcfolder dmg -ov -format UDZO build/bin/June-USB.dmg
       - name: Notarize
