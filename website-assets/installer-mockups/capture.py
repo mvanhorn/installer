@@ -31,8 +31,8 @@ SERVER = LIVEISO / "gui" / "server.py"
 PNG = HERE / "png"
 PORT = int(os.environ.get("MOCK_PORT", "8765"))
 BASE = f"http://127.0.0.1:{PORT}"
-VERSION = os.environ.get("JUNE_VERSION", "0.5")
-BUILD_ID = os.environ.get("JUNE_BUILD_ID", "20261007-0044-5fd2bf5c")
+VERSION = os.environ.get("JUNE_VERSION", "0.6")
+BUILD_ID = os.environ.get("JUNE_BUILD_ID", "20261011-0044-d0692c81")
 
 STAGES = [
     ("01-home.png", "Installer home",
@@ -128,7 +128,9 @@ def main() -> None:
             page.wait_for_selector("#main .view", timeout=20000)
             page.add_style_tag(content="#dev{display:none!important} #conn{display:none!important}")
             page.wait_for_function(
-                "document.querySelector('#brand-sub') && document.querySelector('#brand-sub').textContent.includes('0.5')",
+                "(v) => document.querySelector('#brand-sub')"
+                " && document.querySelector('#brand-sub').textContent.includes(v)",
+                arg=VERSION,
                 timeout=10000,
             )
             page.wait_for_timeout(700)
