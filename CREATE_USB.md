@@ -137,7 +137,7 @@ oven backups on the `Ventoy` partition.
 
 The installer is a single file, `june-local-live.iso`. The current release is
 always at <https://downloads.project-july.org/installer/latest>. Each version
-has its own URL (e.g. `…/installer/v0.5/june-local-live.iso`). Its SHA-256 is on
+has its own URL (e.g. `…/installer/v0.6/june-local-live.iso`). Its SHA-256 is on
 the website and in <https://downloads.project-july.org/installer/latest.json>,
 which June USB reads. Check it before use:
 

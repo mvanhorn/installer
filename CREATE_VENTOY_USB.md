@@ -61,9 +61,9 @@ installer. It is written so a website author can turn it into a tutorial.
    sha256sum june-local-live.iso
    ```
 
-   Compare the result with the hash shown on the release page. The 0.5 release
-   build `20261010-1625-564f483f` has
-   SHA256 `2d768b23c47cc68e71271d97564820702df78415cf56796ee71d22048e1e309a`.
+   Compare the result with the hash shown on the release page. The 0.6 release
+   build `20261011-0044-d0692c81` has
+   SHA256 `89a7d6b9d309241a4514b21a57ac9d49ea3f02853136193a26570613ff3d0608`.
    The website should always show the current release's hash.
 
 ## Step 2 — Install Ventoy (Windows)
