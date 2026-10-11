@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     live-build xorriso isolinux syslinux-utils \
     grub-pc-bin fdisk \
+    cpio \
     curl ca-certificates git rsync \
     build-essential \
     && rm -rf /var/lib/apt/lists/*

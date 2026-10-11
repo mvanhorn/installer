@@ -25,9 +25,65 @@ grubdir=/usr/lib/grub/i386-pc
 # Debian ships grub-bios-setup in /usr/sbin, Ubuntu only in the GRUB lib dir.
 bios_setup="$(command -v grub-bios-setup || echo "$grubdir/grub-bios-setup")"
 
-# grub-bios-setup cannot resolve files on tmpfs, so avoid /tmp.
-work="$(mktemp -d /var/tmp/june-bios.XXXXXX)"
-trap 'rm -rf "$work"' EXIT
+# grub-bios-setup canonicalises the filesystem that holds its working
+# directory and dies on filesystems without a backing block device, which is
+# exactly what Docker's overlay and tmpfs are:
+#
+#   grub-bios-setup: error: failed to get canonical path of `overlay'
+#
+# So when /var/tmp is not device-backed, put the work directory on a
+# loop-backed ext4 image instead.  On a normal build host this is skipped.
+fs_source() {
+  local path="$1" best="" bestsrc="" src mp rest
+  while read -r src mp rest; do
+    mp="${mp//\\040/ }"
+    if [ "${#mp}" -gt "${#best}" ]; then
+      case "$path" in
+        "$mp"|"$mp"/*) best="$mp"; bestsrc="$src" ;;
+      esac
+    fi
+  done < /proc/mounts
+  printf '%s\n' "$bestsrc"
+}
+
+workroot=/var/tmp
+work=""
+scratch=""
+loopdev=""
+cleanup() {
+  [ -n "$scratch" ] && umount "$scratch/mnt" 2>/dev/null || true
+  [ -n "$loopdev" ] && losetup -d "$loopdev" 2>/dev/null || true
+  [ -n "$work" ] && rm -rf "$work"
+  [ -n "$scratch" ] && rm -rf "$scratch"
+  true
+}
+trap cleanup EXIT
+
+case "$(fs_source "$workroot")" in
+  /dev/*) ;;
+  *)
+    command -v mkfs.ext4 >/dev/null || {
+      echo "mkfs.ext4 is required: $workroot is not on a device-backed filesystem and GRUB cannot use it" >&2
+      exit 1
+    }
+    for n in 0 1 2 3 4 5 6 7; do
+      [ -e "/dev/loop$n" ] || mknod "/dev/loop$n" b 7 "$n" 2>/dev/null || true
+    done
+    scratch="$(mktemp -d /var/tmp/june-bios-scratch.XXXXXX)"
+    truncate -s 128M "$scratch/loop.img"
+    mkfs.ext4 -qF "$scratch/loop.img"
+    loopdev="$(losetup -f 2>/dev/null || true)"
+    if [ -z "$loopdev" ] || ! losetup "$loopdev" "$scratch/loop.img"; then
+      echo "no free loop device for the GRUB scratch filesystem" >&2
+      exit 1
+    fi
+    mkdir -p "$scratch/mnt"
+    mount "$loopdev" "$scratch/mnt"
+    workroot="$scratch/mnt"
+    ;;
+esac
+
+work="$(mktemp -d "$workroot/june-bios.XXXXXX")"
 mkdir -p "$out"
 
 cat > "$work/early.cfg" <<'EOF'
