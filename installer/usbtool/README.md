@@ -90,6 +90,13 @@ and offers the last three: the latest is preselected, older ones are folded
 away under it. An ISO the user picks is verified if it matches any listed
 version. Without `releases.json` the app offers `latest.json` alone.
 
+Downloads are cached per version (`%LOCALAPPDATA%\June USB\<version>\`,
+`~/Library/Caches/June USB/<version>/`). A cached ISO is checked against its
+SHA256 and reused. A download that stops is kept as `.part` and continued
+next time with a range request; the SHA256 still covers the whole file, and a
+part that does not match is deleted. After a download, ISOs of versions the
+app no longer offers are removed.
+
 `JUNE_USB_MANIFEST` and `JUNE_USB_RELEASES` override the URLs for testing.
 Without a manifest, users can still pick an ISO they downloaded; it is then
 shown as not verified.

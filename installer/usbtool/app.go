@@ -93,6 +93,9 @@ func (a *App) Release() (*stick.Release, error) {
 	return rel, nil
 }
 
+// offered is how many releases the app offers (and keeps cached).
+const offered = 3
+
 // Releases fetches every published release, newest first, so the user can
 // pick an older one.
 func (a *App) Releases() ([]stick.Release, error) {
@@ -104,6 +107,11 @@ func (a *App) Releases() ([]stick.Release, error) {
 	a.releases = rels
 	a.release = &rels[0]
 	a.mu.Unlock()
+	// Offer the newest few; a.releases keeps them all, so an ISO the user
+	// picks is still recognised if it is older.
+	if len(rels) > offered {
+		rels = rels[:offered]
+	}
 	return rels, nil
 }
 
@@ -196,6 +204,16 @@ func (a *App) Download(version string) (*ISOInfo, error) {
 			return nil, errors.New("cancelled")
 		}
 		return nil, err
+	}
+	// Keep only the versions the app offers (1.4 GB each).
+	a.mu.Lock()
+	keep := a.releases
+	a.mu.Unlock()
+	if len(keep) > offered {
+		keep = keep[:offered]
+	}
+	if len(keep) > 0 {
+		stick.PruneCache(append(append([]stick.Release{}, keep...), *rel))
 	}
 	return a.useISO(path, rel.SHA256, rel)
 }
