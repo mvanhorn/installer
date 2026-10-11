@@ -4,9 +4,9 @@ Unsigned builds work. Windows shows "Windows protected your PC" (More info →
 Run anyway), and macOS makes users allow the app in System Settings →
 Privacy & Security. Signed builds open normally.
 
-`.github/workflows/june-usb.yml` signs automatically when a `usb-v*` tag is
-pushed **and** the secrets below exist. Without them it still builds,
-unsigned.
+`.github/workflows/june-usb.yml` builds every `usb-v*` tag unsigned. A
+**signed** release is a manual run of the workflow on `main` (see
+[Releasing](#releasing)); it signs when the secrets below exist.
 
 ## Windows: Azure Artifact Signing
 
@@ -48,13 +48,12 @@ timestamp, so released files stay valid after you stop paying.
 7. *Microsoft Entra ID → App registrations → New registration*: name
    `june-usb-github`, single tenant. Note the **Application (client) ID**
    and **Directory (tenant) ID**.
-8. In GitHub, *prj-july/installer → Settings → Environments → New
-   environment* `release`. Optionally limit it to tags `usb-v*`
-   (*Deployment branches and tags*). Then, in the Azure app: *Certificates &
-   secrets → Federated credentials → Add → GitHub Actions deploying Azure
-   resources*. Organization `prj-july`, repository `installer`, entity
-   **Environment**, name `release`. (Federated credentials can't match tag
-   wildcards; the signing job runs in this environment instead.)
+8. In that app: *Certificates & secrets → Federated credentials → Add →
+   GitHub Actions deploying Azure resources*. Organization `prj-july`,
+   repository `installer`, entity **Branch**, branch `main`, name e.g.
+   `installer-main`. This lets workflow runs on `main` (and nothing else) sign.
+   (Private repos on GitHub Free have no environments, and federated
+   credentials can't match tag patterns, so signing runs from `main`.)
 9. In the signing account: *Access control (IAM) → Add role assignment →
    **Artifact Signing Certificate Profile Signer** → the app
    `june-usb-github`*.
@@ -107,17 +106,19 @@ active membership to sign new releases.
 
 ## Releasing
 
-```sh
-git tag usb-v0.1.0 && git push origin usb-v0.1.0
-```
-
-The workflow attaches `June-USB.exe`, `June-USB.dmg` and `SHA256SUMS` to a
-**draft** GitHub release. Check it, download the three files, then put them
-on the download site, where the website links them:
-
-```sh
-./publish_usbtool.sh usb-v0.1.0 ~/Downloads/june-usb-release
-```
-
-That uploads `june-usb/usb-v0.1.0/…` (kept) and replaces
-`https://downloads.project-july.org/june-usb/June-USB.exe` and `.dmg`.
+1. Tag the commit and push the tag. This builds it unsigned, as a check:
+   ```sh
+   git tag -a usb-v0.1.2 -m "June USB 0.1.2" && git push origin usb-v0.1.2
+   ```
+2. On GitHub: *Actions → June USB → Run workflow*, branch **main**, tag
+   `usb-v0.1.2`. This builds that tag, signs it and attaches `June-USB.exe`,
+   `June-USB.dmg` and `SHA256SUMS` to a **draft** GitHub release.
+   (`gh workflow run june-usb.yml -R prj-july/installer -f tag=usb-v0.1.2`
+   does the same.)
+3. Check the draft, download the three files, then put them on the download
+   site, where the website links them:
+   ```sh
+   ./publish_usbtool.sh usb-v0.1.2 ~/Downloads/june-usb-release
+   ```
+   That uploads `june-usb/usb-v0.1.2/…` (kept) and replaces
+   `https://downloads.project-july.org/june-usb/June-USB.exe` and `.dmg`.

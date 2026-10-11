@@ -1,8 +1,12 @@
 # Builds June USB (installer/usbtool) for Windows and macOS.
 #
-# Every push/PR that touches the tool is built and tested unsigned.  A tag
-# "usb-vX.Y.Z" additionally signs (when the secrets below exist) and attaches
-# the files to a draft GitHub release.  See installer/usbtool/SIGNING.md.
+# Every PR that touches the tool and every "usb-vX.Y.Z" tag is built and
+# tested unsigned.  A signed release is a manual run on main (Actions > June
+# USB > Run workflow, with the tag to build): it signs (when the secrets below
+# exist) and attaches the files to a draft GitHub release.  Signing runs on
+# main because the Azure federated credential trusts refs/heads/main: private
+# repos on GitHub Free have no environments, and Azure can't match a tag
+# pattern.  See installer/usbtool/SIGNING.md.
 #
 # Windows (Azure Artifact Signing, OIDC, no stored keys):
 #   secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
@@ -19,6 +23,10 @@ on:
   pull_request:
     paths: ["installer/usbtool/**", ".github/workflows/june-usb.yml"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and sign, e.g. usb-v0.1.2 (push the tag first)"
+        required: true
 
 permissions:
   contents: read
@@ -26,7 +34,7 @@ permissions:
 env:
   WAILS_VERSION: v2.16.0
   # Tags give the release version; other builds are marked as dev builds.
-  TOOL_VERSION: ${{ startsWith(github.ref, 'refs/tags/usb-v') && github.ref_name || format('dev-{0}', github.sha) }}
+  TOOL_VERSION: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/usb-v') && github.ref_name) || format('dev-{0}', github.sha) }}
 
 defaults:
   run:
@@ -37,6 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: installer/usbtool/go.mod
@@ -50,6 +60,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: installer/usbtool/go.mod
@@ -62,13 +74,10 @@ jobs:
           name: June-USB-windows-unsigned
           path: installer/usbtool/build/bin/June-USB.exe
 
-  # Separate job so only tag builds touch the "release" environment, whose
-  # name is what the Azure federated credential trusts.
   sign-windows:
-    if: startsWith(github.ref, 'refs/tags/usb-v') && vars.AZURE_SIGNING_ACCOUNT != ''
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.AZURE_SIGNING_ACCOUNT != ''
     needs: windows
     runs-on: windows-latest
-    environment: release
     permissions:
       contents: read
       id-token: write # Azure OIDC login
@@ -126,10 +135,12 @@ jobs:
     needs: test
     runs-on: macos-latest
     env:
-      CAN_SIGN: ${{ startsWith(github.ref, 'refs/tags/usb-v') }}
+      CAN_SIGN: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
       HAS_CERT: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: installer/usbtool/go.mod
@@ -186,7 +197,7 @@ jobs:
   # Releases are signed releases: without the Windows signing setup this job
   # is skipped, and the unsigned builds stay available as run artifacts.
   release:
-    if: startsWith(github.ref, 'refs/tags/usb-v')
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: [sign-windows, macos]
     runs-on: ubuntu-latest
     permissions:
@@ -204,7 +215,8 @@ jobs:
       - name: Draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
         run: |
-          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --verify-tag \
-            --title "June USB ${GITHUB_REF_NAME#usb-}" --notes "Signed builds of June USB. See installer/usbtool/SIGNING.md." \
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "June USB ${TAG#usb-}" --notes "Signed builds of June USB. See installer/usbtool/SIGNING.md." \
             dist/June-USB.exe dist/June-USB.dmg dist/SHA256SUMS
