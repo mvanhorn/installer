@@ -163,7 +163,7 @@ def make_overview():
     out = [title_header("June Local on a Ventoy USB", "Download → create the stick → boot → install or back up")]
     steps = [
         ("1", "Download", "Ventoy from ventoy.net and the latest june-local-live.iso. Verify the SHA256.", BLUE),
-        ("2", "Create the stick", "Install Ventoy to a 32 GB+ USB. MBR, keep the exFAT partition label Ventoy.", EMBER),
+        ("2", "Create the stick", "Install Ventoy to a 16 GB+ USB. MBR, keep the exFAT partition label Ventoy.", EMBER),
         ("3", "Copy the files", "june-local-live.iso at the root, plus ventoy/ventoy.json. Leave ~8 GB free.", EMBER2),
         ("4", "Boot the laptop", "Handle Secure Boot, pick the USB, then choose the graphical installer.", GREEN),
         ("5", "Install or back up", "The live system runs from RAM. Logs go to june-logs, certs to june-certs.", AMBER),
@@ -256,7 +256,7 @@ def make_usb_layout():
     out.append(text(960, 320, "exFAT · keep the label · visible in Windows/Linux", size=19, fill=MUTED, anchor="middle"))
 
     items = [
-        ("june-local-live.iso", "≈ 1.1 GB · boot image", EMBER),
+        ("june-local-live.iso", "≈ 1.4 GB · boot image", EMBER),
         ("ventoy/ventoy.json", "auto-select the ISO", EMBER2),
         ("june-logs/", "installer logs", BLUE),
         ("june-certs/", "custom CA + leaf", GREEN),
@@ -269,7 +269,7 @@ def make_usb_layout():
         out.append(card(x, yy, 430, 120, name, sub, accent=color, title_size=23, pad=20))
 
     out.append(card(120, 730, 1360, 90, "Never FAT32", "FAT32 cannot store the ~7.3 GB oven backup. Use the Ventoy exFAT default or NTFS.", accent=RED, title_size=23, pad=20))
-    out.append(footer("32 GB minimum · 64 GB recommended if the same stick will hold a backup"))
+    out.append(footer("16 GB minimum · 32 GB recommended if the same stick will hold a backup"))
     return svg_doc("".join(out))
 
 
@@ -278,7 +278,7 @@ def make_copy_config():
     out.append(window_chrome(100, 170, 700, "Ventoy (E:) — file manager"))
     out.append(rect(130, 250, 640, 500, fill=PANEL, rx=14))
     rows = [
-        ("june-local-live.iso", "1.1 GB", EMBER),
+        ("june-local-live.iso", "1.4 GB", EMBER),
         ("ventoy/", "folder", EMBER2),
         ("june-logs/", "created at install", BLUE),
         ("june-certs/", "created at install", GREEN),
