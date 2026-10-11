@@ -62,6 +62,7 @@ const ui = {
   view: "release",
   info: { guideUrl: "https://project-july.org/setup" },
   release: null, releaseErr: "", releaseLoading: true,
+  releases: [], pick: 0, olderOpen: false, // releases.json, newest first; pick indexes it (0 = latest)
   iso: null, isoErr: "",
   bytes: null,           // {done, total, phase, t0}
   drives: null, drivesErr: "", showAll: false, sel: "",
@@ -126,18 +127,39 @@ function flow(step, body) {
   return `<div class="flow">${wizard(step)}<div>${body}</div></div>`;
 }
 
+// The latest release as a big card, the older ones from releases.json as
+// small rows under it.  With only latest.json it is the single card, as before.
+function releaseList() {
+  const rs = ui.releases.length ? ui.releases : [ui.release];
+  const when = (r) => (r.date ? new Date(r.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "");
+  const sub = (r) => [size(r.size), when(r)].filter(Boolean).join(" · ");
+  const one = rs.length === 1;
+  const latest = `<label class="rel${one ? "" : " rel-latest"}${ui.pick === 0 && !one ? " sel" : ""}">
+    ${one ? "" : `<input type="radio" name="release" value="0"${ui.pick === 0 ? " checked" : ""}>`}
+    <div class="rel-icon">${icon("down")}</div>
+    <div class="rel-main">
+      <div class="rel-title">June Local ${esc(rs[0].version)}${one ? "" : `<span class="pill ok">Latest</span>`}</div>
+      <div class="rel-sub">${sub(rs[0])} · downloads.project-july.org · checked with SHA256${rs[0].sha256 ? ` <span class="sha" title="SHA256 ${esc(rs[0].sha256)}">${esc(rs[0].sha256.slice(0, 8))}</span>` : ""}</div>
+    </div>
+    ${one ? "" : `<span class="box round">${CHECK}</span>`}
+  </label>`;
+  if (one) return latest;
+  const older = rs.slice(1).map((r, i) => opt("release", `June Local ${esc(r.version)}`, sub(r), ui.pick === i + 1,
+    { radio: true, value: String(i + 1), side: `<span class="sha" title="SHA256 ${esc(r.sha256)}">${esc((r.sha256 || "").slice(0, 8))}</span>` })).join("");
+  const note = ui.pick ? `<div class="warnline older-note">${MARK.warn}<span>${esc(rs[ui.pick].version)} is not the latest version. Pick it only if the latest one does not work for you.</span></div>` : "";
+  return `${latest}
+    <details class="older"${ui.pick || ui.olderOpen ? " open" : ""}>
+      <summary>${CHEVRON}Older versions</summary>
+      <div class="older-list">${older}</div>
+    </details>${note}`;
+}
+
 const VIEWS = {
   release() {
     let card;
     if (ui.releaseLoading) card = `<div class="skel"></div>`;
-    else if (ui.release) {
-      const r = ui.release;
-      card = `<div class="rel">
-        <div class="rel-icon">${icon("down")}</div>
-        <div class="rel-main"><div class="rel-title">June Local ${esc(r.version)}</div>
-          <div class="rel-sub">${size(r.size)} · downloads.project-july.org · checked with SHA256</div></div>
-      </div>`;
-    } else {
+    else if (ui.release) card = releaseList();
+    else {
       card = `<div class="warnline">${MARK.warn}<span>Could not check for the latest release: ${esc(ui.releaseErr)}<br>You can still use an ISO file you downloaded before.</span></div>`;
     }
     const b = ui.bytes;
@@ -160,11 +182,11 @@ const VIEWS = {
       <h1>Get the installer</h1>
       <p class="muted">June USB downloads the latest June Local installer and puts it on a USB stick.
         The stick also keeps room for oven backups, logs and certificates.</p>
-      <div class="panel" style="margin-top:22px">${card}${prog}</div>
+      <div class="${ui.releases.length > 1 ? "rels" : "panel"}" style="margin-top:22px">${card}${prog}</div>
       ${err}
       <div class="actions">
         ${busy ? `<button class="btn ghost" type="button" data-do="cancel">Cancel</button>`
-               : `<button class="btn ember" type="button" data-do="download"${ui.release ? "" : " disabled"}>${icon("down")}Download and continue</button>
+               : `<button class="btn ember" type="button" data-do="download"${ui.release ? "" : " disabled"}>${icon("down")}${ui.pick ? `Download ${esc(ui.release.version)} and continue` : "Download and continue"}</button>
                   <button class="link" type="button" data-do="choose">Use an ISO file I already have</button>`}
       </div>
       <p class="foot">June USB ${esc(ui.info.version || "")}</p>`);
@@ -339,10 +361,15 @@ async function loadRelease() {
   ui.releaseLoading = true;
   render();
   try {
-    ui.release = await api.Release();
+    // releases.json lists every published version; offer the last three.
+    // If that list cannot be read it is latest.json alone, as before.
+    try { ui.releases = (await api.Releases()).slice(0, 3); } catch (e) { ui.releases = []; }
+    ui.release = ui.releases.length ? ui.releases[0] : await api.Release();
+    ui.pick = 0;
     ui.releaseErr = "";
   } catch (e) {
     ui.release = null;
+    ui.releases = [];
     ui.releaseErr = errText(e);
   }
   ui.releaseLoading = false;
@@ -354,7 +381,7 @@ async function getISO(how) {
   ui.bytes = { done: 0, total: 0, phase: how === "download" ? "download" : "check", t0: Date.now() };
   render();
   try {
-    const iso = how === "download" ? await api.Download() : await api.ChooseISO();
+    const iso = how === "download" ? await api.Download(ui.release.version) : await api.ChooseISO();
     ui.bytes = null;
     if (!iso) { render(); return; } // dialog cancelled
     ui.iso = iso;
@@ -437,6 +464,7 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.name === "drive") ui.sel = t.value;
+  else if (t.name === "release") { ui.pick = +t.value; ui.release = ui.releases[ui.pick]; ui.olderOpen = true; }
   else if (t.name === "mode") { ui.mode = t.value; ui.ack = false; }
   else if (t.name === "ack") ui.ack = t.checked;
   else return;
@@ -445,6 +473,7 @@ document.addEventListener("change", (ev) => {
 
 document.addEventListener("toggle", (ev) => {
   if (ev.target.id === "r-log") ui.logOpen = ev.target.open;
+  else if (ev.target.classList.contains("older")) ui.olderOpen = ev.target.open;
 }, true);
 
 (async () => {
@@ -492,16 +521,25 @@ function mockApi() {
   const steps = ["Prepare the stick", "Copy the installer", "Verify the copy", "Make it bootable", "Finish"];
   let cancelled = false;
   return {
-    Info: async () => ({ version: "0.1.0", os: "windows", guideUrl: "https://project-july.org/setup" }),
-    Release: async () => { await wait(400); return { version: "v0.5", url: "", sha256: "", size: 1406533632 }; },
-    Download: async () => {
+    Info: async () => ({ version: "1.0", os: "windows", guideUrl: "https://project-july.org/setup" }),
+    Release: async () => { await wait(400); return { version: "v0.7", url: "", sha256: "ac0a86673b7cc7c15d73f7109066baf1a43f7f1f1767555b20d2dacef59438c5", size: 1413529600 }; },
+    // "#one" leaves Releases out, to preview the latest.json-only screen.
+    Releases: location.hash === "#one" ? undefined : async () => {
+      await wait(400);
+      return [
+        { version: "v0.7", sha256: "ac0a86673b7cc7c15d73f7109066baf1a43f7f1f1767555b20d2dacef59438c5", size: 1413529600, date: "2026-10-11" },
+        { version: "v0.6", sha256: "89a7d6b9d309241a4514b21a57ac9d49ea3f02853136193a26570613ff3d0608", size: 1413529600, date: "2026-10-11" },
+        { version: "v0.5", sha256: "2d768b23c47cc68e71271d97564820702df78415cf56796ee71d22048e1e309a", size: 1406533632, date: "2026-10-10" },
+      ];
+    },
+    Download: async (version) => {
       cancelled = false;
       for (let d = 0; d <= 1406533632; d += 60e6) {
         if (cancelled) throw new Error("cancelled");
         emit("bytes", { done: d, total: 1406533632, phase: "download" });
         await wait(80);
       }
-      return { path: "june-local-live.iso", version: "v0.5", sha256: "", size: 1406533632, verified: true, bios: true };
+      return { path: "june-local-live.iso", version: version || "v0.7", sha256: "", size: 1413529600, verified: true, bios: true };
     },
     ChooseISO: async () => ({ path: "x.iso", version: "build 20261005-09:29", sha256: "", size: 1405157376, verified: false, bios: false }),
     Cancel: () => { cancelled = true; },

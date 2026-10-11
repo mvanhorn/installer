@@ -24,51 +24,90 @@ import (
 // installer/liveiso/PUBLISHING.md for how it is published.
 const DefaultManifestURL = "https://downloads.project-july.org/installer/latest.json"
 
+// DefaultReleasesURL lists every published version, newest first.
+const DefaultReleasesURL = "https://downloads.project-july.org/installer/releases.json"
+
 // ISOName is the release file name; it never changes between versions.
 const ISOName = "june-local-live.iso"
 
-// Release is the content of latest.json.
+// Release is the content of latest.json, or one entry of releases.json.
 type Release struct {
 	Version string `json:"version"`
 	URL     string `json:"url"`
 	SHA256  string `json:"sha256"`
 	Size    int64  `json:"size"`
+	Date    string `json:"date,omitempty"` // releases.json only
 }
 
 var hexSHA256 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-// FetchRelease downloads and validates the release manifest.
-func FetchRelease(ctx context.Context, manifestURL string) (*Release, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("could not reach the download server: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("the download server answered %s for %s", resp.Status, manifestURL)
-	}
-	var rel Release
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&rel); err != nil {
-		return nil, fmt.Errorf("the release manifest is not valid JSON: %w", err)
-	}
+func (rel *Release) check() error {
 	rel.SHA256 = strings.ToLower(strings.TrimSpace(rel.SHA256))
 	switch {
 	case rel.Version == "":
-		return nil, errors.New("the release manifest has no version")
+		return errors.New("the release manifest has no version")
 	case !strings.HasPrefix(rel.URL, "https://"):
-		return nil, errors.New("the release manifest has no https download URL")
+		return errors.New("the release manifest has no https download URL")
 	case !hexSHA256.MatchString(rel.SHA256):
-		return nil, errors.New("the release manifest has no valid SHA256")
+		return errors.New("the release manifest has no valid SHA256")
 	case rel.Size <= 0:
-		return nil, errors.New("the release manifest has no size")
+		return errors.New("the release manifest has no size")
+	}
+	return nil
+}
+
+// FetchRelease downloads and validates the release manifest.
+func FetchRelease(ctx context.Context, manifestURL string) (*Release, error) {
+	var rel Release
+	if err := fetchJSON(ctx, manifestURL, &rel); err != nil {
+		return nil, err
+	}
+	if err := rel.check(); err != nil {
+		return nil, err
 	}
 	return &rel, nil
+}
+
+// FetchReleases downloads releases.json and returns its valid entries,
+// newest first.
+func FetchReleases(ctx context.Context, listURL string) ([]Release, error) {
+	var list struct {
+		Releases []Release `json:"releases"`
+	}
+	if err := fetchJSON(ctx, listURL, &list); err != nil {
+		return nil, err
+	}
+	var out []Release
+	for _, rel := range list.Releases {
+		if rel.check() == nil {
+			out = append(out, rel)
+		}
+	}
+	if len(out) == 0 {
+		return nil, errors.New("the release list has no valid releases")
+	}
+	return out, nil
+}
+
+func fetchJSON(ctx context.Context, url string, v any) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("could not reach the download server: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("the download server answered %s for %s", resp.Status, url)
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(v); err != nil {
+		return fmt.Errorf("the release manifest is not valid JSON: %w", err)
+	}
+	return nil
 }
 
 // CachePath is where a release's ISO is kept between runs.

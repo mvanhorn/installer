@@ -60,7 +60,7 @@ wails build -platform darwin/universal -skipbindings # on a Mac: build/bin/June-
 go test ./stick
 ```
 
-Releases come from `.github/workflows/june-usb.yml` (tag `usb-vX.Y.Z`); see
+Releases come from `.github/workflows/june-usb.yml` (tag `usb-vX.Y`); see
 [SIGNING.md](SIGNING.md).
 
 ## Test without a real stick (Linux/WSL, as root)
@@ -84,5 +84,12 @@ The app reads `https://downloads.project-july.org/installer/latest.json`:
  "sha256": "ac0a86673b7cc7c15d73f7109066baf1a43f7f1f1767555b20d2dacef59438c5", "size": 1413529600}
 ```
 
-`JUNE_USB_MANIFEST` overrides the URL for testing. Without a manifest, users
-can still pick an ISO they downloaded; it is then shown as not verified.
+It also reads `https://downloads.project-july.org/installer/releases.json`
+(every published version, newest first; see `installer/liveiso/PUBLISHING.md`)
+and offers the last three: the latest is preselected, older ones are folded
+away under it. An ISO the user picks is verified if it matches any listed
+version. Without `releases.json` the app offers `latest.json` alone.
+
+`JUNE_USB_MANIFEST` and `JUNE_USB_RELEASES` override the URLs for testing.
+Without a manifest, users can still pick an ISO they downloaded; it is then
+shown as not verified.

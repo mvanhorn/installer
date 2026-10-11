@@ -1,6 +1,6 @@
 # Builds June USB (installer/usbtool) for Windows and macOS.
 #
-# Every PR that touches the tool and every "usb-vX.Y.Z" tag is built and
+# Every PR that touches the tool and every "usb-vX.Y" tag is built and
 # tested unsigned.  A signed release is a manual run on main (Actions > June
 # USB > Run workflow, with the tag to build): it signs (when the secrets below
 # exist) and attaches the files to a draft GitHub release.  Signing runs on
@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to build and sign, e.g. usb-v0.1.2 (push the tag first)"
+        description: "Tag to build and sign, e.g. usb-v1.0 (push the tag first)"
         required: true
 
 permissions:
