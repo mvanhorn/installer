@@ -11,10 +11,38 @@ June blobs, firmware and private keys are **not** included; see
 `installer/liveiso/PUBLISHING.md` for the full input list and what
 must be supplied locally.
 
+## Make the installer USB stick
+
+The installer runs on a laptop, started from a USB stick of 16 GB or more
+(32 GB recommended). The easiest way to make the stick is **June USB**, a
+small app for [Windows](https://downloads.project-july.org/june-usb/June-USB.exe)
+and [Mac](https://downloads.project-july.org/june-usb/June-USB.dmg). It
+downloads the latest installer, checks its SHA-256, and prepares the stick:
+
+1. **Get the installer**: *Download and continue* (or use an ISO you already have).
+2. **Choose the USB stick**: only USB drives are listed; built-in disks never are.
+3. **Confirm**: tick that you've copied off what you need, then confirm the
+   system dialog that names the stick. Making the stick erases it.
+4. **Wait** a few minutes while it writes and checks every file. It ejects the
+   stick when it's done.
+
+<img src="website-assets/screenshots/june-usb/02-choose-stick.png" width="600" alt="June USB: Choose the USB stick">
+
+The stick boots with one menu and Secure Boot on, and keeps the rest of its
+space (`JUNE`) for oven backups, logs and certificates. Running June USB again
+updates the installer and keeps those.
+
+**Alternatives:** [Ventoy](CREATE_VENTOY_USB.md) (also the way on Linux), or
+the [installer image](https://downloads.project-july.org/installer/latest) on
+its own. The full guide, with every screen, is [`CREATE_USB.md`](CREATE_USB.md).
+Then follow [`USE_LIVE_INSTALLER.md`](USE_LIVE_INSTALLER.md).
+
 ## Layout
 
 ```
 installer/liveiso/   build the ISO (Docker + live-build) and the installer menu
+installer/usbtool/   June USB: Windows/Mac app (and Linux CLI) that makes the
+                     installer USB stick
 golocal/             Go source for june-local and june-camerad (make oven,
                      make camerad); prebuilt binaries are not committed
 onoven/              on-oven deploy scripts
@@ -34,8 +62,9 @@ repo root) plus the locally supplied blobs.
 
 The camera/live-view/interior-light architecture is summarized in
 [`CAMERA.md`](CAMERA.md).
-The end-user USB recipe (Ventoy, Secure Boot, backup/log/cert layout) is in
-[`CREATE_VENTOY_USB.md`](CREATE_VENTOY_USB.md).
+How to make the installer USB stick (the June USB app, with Ventoy and the
+plain ISO as alternatives) is in [`CREATE_USB.md`](CREATE_USB.md); the Ventoy
+recipe in detail is in [`CREATE_VENTOY_USB.md`](CREATE_VENTOY_USB.md).
 The live installer walkthrough (basic/custom install, backup, restore, phone
 UI, text mode) is in [`USE_LIVE_INSTALLER.md`](USE_LIVE_INSTALLER.md).
 Website tutorial screenshots and mockups are in [`website-assets/`](website-assets/)
@@ -55,9 +84,11 @@ JUNE_LR=<this-repo> JUNE_ROOT=<tree-with-tools/certs> bash prepare_assets.sh
 bash build_live_iso.sh          # writes june-local-live.iso
 ```
 
-`build_live_iso.sh` uses Docker (legacy builder) to run live-build. Copy the
-resulting ISO to a Ventoy stick (`flash_to_ventoy.sh`), boot the target
-machine from it, and follow the on-screen menu.
+`build_live_iso.sh` uses Docker (legacy builder) to run live-build. Put the
+resulting ISO on a stick with June USB (**Use an ISO file I already have**) or
+Ventoy (`flash_to_ventoy.sh`), boot the target machine from it, and follow the
+on-screen menu. `publish_release.sh` uploads a release and its `latest.json`
+(see `installer/liveiso/PUBLISHING.md`).
 
 Remote toast levels and the other non-bake primitives need the optional Chef
 patch. Build it from your own extracted Chef APK with

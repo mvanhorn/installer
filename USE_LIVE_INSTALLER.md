@@ -1,13 +1,13 @@
 # Using the June Local live installer
 
-This is the companion to `CREATE_VENTOY_USB.md`: what the live installer looks
+This is the companion to `CREATE_USB.md`: what the live installer looks
 like and how to use each job. The screenshots below are real/mockup assets in
 `website-assets/`; replace the mockups with the phone screenshots from
 `website-assets/screenshots/` when they are available.
 
 ## Before you start
 
-- The Ventoy USB stick from `CREATE_VENTOY_USB.md`.
+- The USB stick from `CREATE_USB.md` (made with June USB, or with Ventoy).
 - The laptop that will run the installer.
 - The oven, its power cable, and the USB cable used for RCM/UMS.
 - Optional: a phone on the same network as the laptop.
@@ -23,8 +23,9 @@ Both do the same jobs.
 
 ## 1. Boot the installer
 
-1. Boot the laptop from the Ventoy stick. Ventoy appears first; after its
-   timeout it boots `june-local-live.iso`.
+1. Boot the laptop from the stick. A June USB stick goes straight to the June
+   Local menu. On a Ventoy stick, Ventoy's menu appears first and boots
+   `june-local-live.iso` after its timeout.
 2. The June Local menu appears. Choose **Graphical installer (default)** unless
    you are debugging, in which case choose **Basic text UI**.
 3. The installer starts and shows the home screen.
@@ -133,8 +134,8 @@ certificate authority.
    **Settings › Security › Install a certificate › CA certificate**.
 5. Pair the phone app using the oven address.
 
-The generated CA and leaf files are saved under `june-certs/` on the Ventoy
-partition. The custom install also has the **Keep the patch after a factory
+The generated CA and leaf files are saved under `june-certs/` on the stick's
+data partition (`JUNE` on a June USB stick, `Ventoy` on a Ventoy stick). The custom install also has the **Keep the patch after a factory
 reset** option.
 
 Assets: `website-assets/png/11-install-options.png`,
@@ -145,8 +146,8 @@ Assets: `website-assets/png/11-install-options.png`,
 1. Choose **Back up the oven**.
 2. The destination screen asks **“Where should the backup go?”** and lists
    usable drives:
-   - **Ventoy (current boot USB)** — the stick you booted from, if it has free
-     space;
+   - **June USB (current boot USB)** or **Ventoy (current boot USB)** — the
+     stick you booted from, if it has free space;
    - a second USB drive;
    - other safe internal/external drives when available.
 
@@ -161,7 +162,8 @@ Assets: `website-assets/png/11-install-options.png`,
 6. On success, the installer writes the `.img` file and a `.sha256` file next
    to it. Safely unplug the drive, then unplug the oven’s power and USB cable.
 
-Logs are saved to `june-logs/` on the Ventoy partition.
+Logs are saved to `june-logs/` on the stick's data partition (`JUNE` or
+`Ventoy`).
 
 Assets: `website-assets/png/15-backup-destination.png`,
 `website-assets/png/13-progress.png`.
@@ -239,7 +241,7 @@ start** button. The details panel and the USB log show the last steps.
 | “Waiting for the oven” never changes | USB cable seated in the laptop (not a hub), SW2 held while powering on, oven power on. Try **Start without detecting** only if you know the oven is in RCM. |
 | No usable backup drive | Drive is exFAT/NTFS/ext4 and writable; at least 8 GB free; rescan. |
 | Wrong size on a restore image | The image is not a complete 7.8 GB oven backup. |
-| Secure Boot verification error | Enroll Ventoy’s key or disable Secure Boot. |
+| Secure Boot verification error | Ventoy sticks only: enroll Ventoy’s key or disable Secure Boot. June USB sticks start with Secure Boot on. |
 | Graphical installer falls back to text | On builds before 2026-10-05 the kiosk log showed `Cannot find Xwayland binary "/usr/bin/Xwayland"`; the current image includes Xwayland and retries the software renderer. Update the USB image, or use the text UI on the older stick. |
 | Job failed part-way | Do not unplug the oven; use **Try again**. If it repeats, save `june-logs/` and ask for help. |
 
@@ -267,7 +269,7 @@ Asset: `website-assets/png/19-safety-checklist.png`.
 - Copy `june-logs/` if you need support.
 - Do not unplug the oven during an install or restore.
 - Do not use FAT32 for the backup drive.
-- Do not rename the Ventoy partition.
+- Do not rename the stick's partitions (`JUNEBOOT`/`JUNE`, or `Ventoy`).
 - Do not close up the oven before testing it.
 
 ## Real screenshots

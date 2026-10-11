@@ -16,10 +16,13 @@ The host needs Docker or Podman (build runs `live-build` inside the container).
 
 ## Flash for friends
 
-- **Ventoy is recommended** if the same USB stick should also hold an eMMC
-  backup: Ventoy keeps a normal writable data partition alongside the boot
-  files, so the backup image lands on the same stick and shows up in Windows
-  for recovery.
+- **June USB is recommended** (`installer/usbtool`, see `CREATE_USB.md`): it
+  makes a stick with the installer on a FAT32 `JUNEBOOT` partition and a
+  writable exFAT `JUNE` partition, so the backup image lands on the same stick
+  and shows up in Windows for recovery. Pass it a local build with
+  **Use an ISO file I already have**.
+- **Ventoy** does the same with its `Ventoy` data partition, and is the way
+  to make the stick on Linux.
 - Balena Etcher also works, but a plain Etcher flash is read-only; in that case
   keep a separate USB drive available for backups.
 - Boot the laptop from the USB. The boot menu has two entries:
@@ -73,8 +76,8 @@ the phone view.
 - The installer auto-detects the June eMMC by size, explicitly skips the boot
   USB/system disk, and refuses to touch other disks.
 - The menu also offers full eMMC **backup to USB** and **restore from USB**
-  (the destination needs at least 8 GB free, and can be the Ventoy boot USB
-  itself).
+  (the destination needs at least 8 GB free, and can be the boot USB itself:
+  its `JUNE` or `Ventoy` data partition).
 - Custom install now asks whether the JuneCloudMessaging patch payload should
   be staged in `/system` (persists across factory reset) or `/data` (does not).
   The app update is applied on the next boot by the June Local copy of

@@ -1,11 +1,16 @@
 # Creating the June Local Ventoy USB stick
 
-This is the user-facing recipe for the USB stick that boots the June Local
+This is the Ventoy recipe for the USB stick that boots the June Local
 installer. It is written so a website author can turn it into a tutorial.
+
+> On Windows and Mac, the **June USB** app is the easier way: it downloads and
+> checks the installer and prepares the stick by itself, with one boot menu and
+> no Secure Boot key to enroll. See [`CREATE_USB.md`](CREATE_USB.md). Ventoy
+> remains the way to make the stick on Linux, and an alternative everywhere.
 
 ## What the user needs
 
-- A USB flash drive. **32 GB minimum, 64 GB recommended** if the same stick
+- A USB flash drive. **16 GB minimum, 32 GB recommended** if the same stick
   will hold an oven backup. USB 3 is strongly preferred.
 - A Windows or Linux computer. Windows users can use the Ventoy GUI; Linux
   users use `Ventoy2Disk.sh`.

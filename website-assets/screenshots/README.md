@@ -28,3 +28,12 @@ Notes:
   screenshots will be public.
 - The current `png/` files are mockups built from the real installer copy and
   colors. Real screenshots can replace them one-for-one.
+
+## June USB
+
+`june-usb/` holds the June USB app screens used in `CREATE_USB.md` and on the
+website. `03`–`06` are from a real run on Windows (a test build, hence the
+"v0.5-bios-test" chip). `01` and `02` are rendered from the app's own UI with
+its mock backend: serve `installer/usbtool/frontend/` and open
+`?mock&screen=release` or `?mock&screen=drives` in a 1026 px wide window
+(headless Edge or Chrome `--screenshot`); the drives shown there are examples.
