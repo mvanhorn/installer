@@ -1,5 +1,8 @@
 vm-record/
+vm-record-run2/
+vm-record-run3/
+.__smbfile*
 june-local-live.iso
-*.mp4
-*.ppm
-*.png
+/*.mp4
+/*.ppm
+/*.png

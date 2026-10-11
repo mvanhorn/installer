@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a0b0d"/>
+      <stop offset="0.55" stop-color="#0e1014"/>
+      <stop offset="1" stop-color="#15171d"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0.70" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.73" stop-color="#ffffff" stop-opacity="0.035"/>
+      <stop offset="0.88" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="1.15" r="0.95">
+      <stop offset="0" stop-color="#ff6a1a" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#ff6a1a" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#ff6a1a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#sheen)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+
+  <!-- ember accent along the bottom edge -->
+  <rect y="597" width="800" height="3" fill="#ff7a2e" opacity="0.6"/>
+
+  <!-- oven mark -->
+  <g transform="translate(48,42)">
+    <rect width="46" height="46" rx="11" fill="#ff7a2e"/>
+    <rect x="9" y="15" width="28" height="22" rx="5" fill="#0b0c0e"/>
+    <circle cx="35.5" cy="9.5" r="2.6" fill="#0b0c0e"/>
+  </g>
+
+  <text x="110" y="72" font-family="Noto Sans, DejaVu Sans, Liberation Sans, sans-serif"
+        font-size="27" font-weight="700" fill="#f4f4f5">Project July</text>
+  <text x="112" y="94" font-family="Noto Sans, DejaVu Sans, Liberation Sans, sans-serif"
+        font-size="12" font-weight="600" letter-spacing="3.1" fill="#f89a4e">JUNE LOCAL INSTALLER</text>
+
+  <text x="48" y="556" font-family="Noto Sans, DejaVu Sans, Liberation Sans, sans-serif"
+        font-size="12" fill="#61666e">project-july.org</text>
+</svg>

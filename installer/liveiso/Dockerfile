@@ -14,6 +14,7 @@ WORKDIR /build
 COPY assets /build/assets
 COPY gui /build/gui
 COPY vendor /build/vendor
+COPY boot-theme /build/boot-theme
 COPY build.sh /build/build.sh
 COPY make_bios_boot.sh /build/make_bios_boot.sh
 RUN chmod +x /build/build.sh

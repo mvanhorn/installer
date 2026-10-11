@@ -924,6 +924,92 @@ prompt 0
 timeout 30
 EOF
 
+# June boot theme: the installer's dark background with ember accents.  The
+# splash and menu replace Debian's defaults; binary_includes runs after
+# binary_syslinux, so files under config/includes.binary win.
+mkdir -p config/includes.binary/isolinux config/includes.binary/boot/grub/live-theme
+cp /build/boot-theme/splash.png config/includes.binary/isolinux/splash.png
+cp /build/boot-theme/splash800x600.png config/includes.binary/isolinux/splash800x600.png
+
+cat > config/bootloaders/isolinux/stdmenu.cfg <<'EOF'
+menu background splash.png
+# syslinux colours are #AARRGGBB (alpha first), not #RRGGBBAA.
+menu color title	* #fff89a4e *
+menu color border	* #00000000 #00000000 none
+menu color sel		* #ff0b0c0e #ffff7a2e *
+menu color hotsel	1;7;37;40 #ff0b0c0e #ffff7a2e *
+menu color tabmsg	* #ffffffff #00000000 *
+menu color help		37;40 #ffdddd00 #00000000 none
+menu vshift 14
+menu rows 8
+menu helpmsgrow 15
+menu cmdlinerow 16
+menu timeoutrow 16
+menu tabmsgrow 18
+menu tabmsg Press ENTER to boot or TAB to edit a menu entry
+EOF
+
+cat > config/bootloaders/isolinux/menu.cfg <<'EOF'
+menu hshift 0
+menu width 82
+menu title June Local Installer
+include stdmenu.cfg
+include live.cfg
+menu clear
+EOF
+
+cat > config/includes.binary/boot/grub/live-theme/theme.txt <<'EOF'
+desktop-image: "/isolinux/splash800x600.png"
+title-text: ""
+message-font: "Unifont Regular 16"
+message-color: "#8b909a"
+terminal-font: "Unifont Regular 16"
+
++ boot_menu {
+        left = 22%
+        width = 56%
+        top = 40%
+        height = 45%
+        item_color = "#c9ccd2"
+	item_font = "Unifont Regular 16"
+        selected_item_color = "#ffb04a"
+	selected_item_font = "Unifont Regular 16"
+        item_height = 20
+        item_padding = 0
+        item_spacing = 10
+	icon_width = 0
+	icon_height = 0
+	item_icon_space = 0
+}
+
+#help bar at the bottom
++ label {
+        top = 100%-50
+        left = 0
+        width = 100%
+        height = 20
+        text = "@KEYMAP_SHORT@"
+        align = "center"
+        color = "#6b7280"
+	font = "Unifont Regular 16"
+}
+
+#progress bar
++ progress_bar {
+        id = "__timeout__"
+        left = 15%
+        top = 100%-84
+        height = 16
+        width = 70%
+        font = "Unifont Regular 16"
+        text_color = "#0b0c0e"
+        fg_color = "#ff7a2e"
+        bg_color = "#23262c"
+        border_color = "#23262c"
+        text = "@TIMEOUT_NOTIFICATION_LONG@"
+}
+EOF
+
 # June USB sticks (installer/usbtool) copy the ISO's files onto FAT32.  Give
 # them the legacy BIOS boot code (built from this container's GRUB, so it
 # matches the i386-pc modules beside it) and the release name.
