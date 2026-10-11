@@ -81,6 +81,25 @@ const stickName = (d) => {
   return labels.length ? labels.join(" and ") : d.name;
 };
 
+/* ---- Appearance: system, light or dark --------------------------------- */
+
+// index.html applies a saved choice before the first paint; this keeps the
+// switch, the saved value and (on Windows) the title bar in step.
+function look(v, save = true) {
+  if (v !== "light" && v !== "dark") v = "system";
+  if (v === "system") delete document.documentElement.dataset.look;
+  else document.documentElement.dataset.look = v;
+  document.querySelectorAll('[data-do="look"]').forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === v)));
+  if (save) { try { localStorage.setItem("look", v); } catch (e) { /* not kept */ } }
+  try {
+    const rt = !PREVIEW && window.runtime;
+    if (rt) (v === "light" ? rt.WindowSetLightTheme : v === "dark" ? rt.WindowSetDarkTheme : rt.WindowSetSystemDefaultTheme)();
+  } catch (e) { /* title bar themes are Windows only */ }
+}
+function savedLook() {
+  try { return localStorage.getItem("look") || "system"; } catch (e) { return "system"; }
+}
+
 function errText(e) {
   const s = e && e.message ? e.message : String(e || "Unknown error");
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -450,7 +469,8 @@ document.addEventListener("click", (ev) => {
   const t = ev.target.closest("[data-do]");
   if (!t || t.disabled) return;
   const d = t.dataset.do;
-  if (d === "download") getISO("download");
+  if (d === "look") look(t.dataset.v);
+  else if (d === "download") getISO("download");
   else if (d === "choose") getISO("choose");
   else if (d === "cancel") api.Cancel();
   else if (d === "showall") { ui.showAll = !ui.showAll; ui.sel = ""; ui.drives = null; refreshDrives(); render(); }
@@ -477,8 +497,10 @@ document.addEventListener("toggle", (ev) => {
 }, true);
 
 (async () => {
+  look(savedLook(), false);
   try {
     await connect();
+    look(savedLook(), false); // now the runtime is there for the title bar
   } catch (e) {
     ui.error = errText(e);
     show("error");

@@ -68,3 +68,24 @@ body { -webkit-user-select: none; user-select: none; cursor: default; }
 .eyebrow .mark { width: 20px; height: 20px; }
 
 .foot { margin-top: 32px; font: 400 13px/1.4 var(--f); color: var(--fg2); }
+
+/* Appearance switch.  app.css follows the system and honours data-look="dark";
+   forcing light needs its light tokens here as well (same values). */
+:root[data-look="light"] {
+  --bg: #ffffff; --bg2: #f7f7f5; --sheen: rgba(255,255,255,0); --rim: rgba(0,0,0,.08);
+  --fg: #18181b; --fg2: #5b5f66; --line: rgba(0,0,0,.10); --track: rgba(0,0,0,.09);
+  --ember: #d9480f; --ember2: #f08a3c; --glow: transparent; --glyph: #d9480f; --gglow: rgba(240,122,42,0);
+  --green: #15803d; --amber: #b45309; --cool: #2f80c8; --grey: #71717a;
+  --btn: #18181b; --btnfg: #ffffff; --focus: #1f6fb2; --hw: 400;
+  --tA: #fbf7f4; --tB: #f5e9e2; --tRim: rgba(217,72,15,.26); --tGlow: rgba(240,122,42,.16); --tSheen: rgba(255,255,255,.7);
+  --uA: #f6f6f7; --uB: #ececee; --uRim: rgba(0,0,0,.12); --uGlyph: #5e6567;
+  --panel: rgba(0,0,0,.025); --dlg: #ffffff; --log: #f4f4f2; --brand: #b23c0d;
+  color-scheme: light;
+}
+.look { display: inline-flex; gap: 2px; padding: 3px; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--line); background: var(--panel); }
+.look button { width: 34px; height: 34px; border: 0; padding: 0; border-radius: 17px; display: grid; place-items: center; background: transparent; color: var(--fg2); cursor: pointer; }
+.look button:hover { color: var(--fg); }
+.look button[aria-checked="true"] { color: var(--glyph); background: radial-gradient(120% 75% at 50% 100%, var(--tGlow), transparent 62%), linear-gradient(180deg, var(--tA), var(--tB)); box-shadow: inset 0 0 0 1px var(--tRim); }
+.look button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.look svg { width: 18px; height: 18px; }
+@media (max-width: 560px) { .look { height: 36px; } .look button { width: 30px; height: 30px; } }
