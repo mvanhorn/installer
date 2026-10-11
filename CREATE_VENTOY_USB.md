@@ -62,8 +62,8 @@ installer. It is written so a website author can turn it into a tutorial.
    ```
 
    Compare the result with the hash shown on the release page. The 0.6 release
-   build `20261011-0044-d0692c81` has
-   SHA256 `89a7d6b9d309241a4514b21a57ac9d49ea3f02853136193a26570613ff3d0608`.
+   build `20261011-0232-f7b73c1b` has
+   SHA256 `119ba2efb9a16336e3932144fa8d25bc6c4713e8aa5738d230d49c93e93e2538`.
    The website should always show the current release's hash.
 
 ## Step 2 — Install Ventoy (Windows)

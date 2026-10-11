@@ -81,7 +81,7 @@ The app reads `https://downloads.project-july.org/installer/latest.json`:
 
 ```json
 {"version": "v0.6", "url": "https://downloads.project-july.org/installer/v0.6/june-local-live.iso",
- "sha256": "89a7d6b9d309241a4514b21a57ac9d49ea3f02853136193a26570613ff3d0608", "size": 1413529600}
+ "sha256": "119ba2efb9a16336e3932144fa8d25bc6c4713e8aa5738d230d49c93e93e2538", "size": 1413529600}
 ```
 
 `JUNE_USB_MANIFEST` overrides the URL for testing. Without a manifest, users
