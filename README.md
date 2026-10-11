@@ -115,6 +115,17 @@ the installer leaves the stock Chef whitelist in place.
 The recipes in `apk-patches/` rebuild the patched apps from APKs you extract
 from your own oven; keys and blobs stay on your machine.
 
+## Certificates
+
+[`packaging/june-standard-ca.crt`](packaging/june-standard-ca.crt) is the
+Project July CA (`CN=*.junelife.com`, backdated to 2000). The standard install's
+server certificate is signed by it, for `api.junelife.com`,
+`messaging.junelife.com` and `june.local`, `june2.local`, `june3.local`. Install
+it on a phone or other client that should trust a standard-install oven. It is
+only the public certificate; its key is in neither this repository nor the
+ISO. Custom installs use a per-home CA from `packaging/generate_certs.sh`
+instead.
+
 ## License
 
 MIT, see [`LICENSE`](LICENSE). The bundled Barlow fonts are under the SIL Open
