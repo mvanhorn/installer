@@ -14,8 +14,10 @@ covers the three ways to make that stick:
 - A USB stick of **16 GB or more**; 32 GB is recommended. The installer takes
   4 GB, and one oven backup is about 7.3 GB. USB 3 is noticeably faster.
 - A Windows 10/11 PC or a Mac with macOS 13 (Ventura) or later to make the stick, and a laptop to start the
-  installer on (it can be the same computer). Macs with Apple chips can make the
-  stick but can't start the installer.
+  installer on (it can be the same computer). The installer needs an Intel or
+  AMD laptop: Macs with Apple chips and Windows laptops with ARM (Snapdragon)
+  processors, such as the Surface Pro 9 with 5G or the Surface Pro X, can make
+  the stick but can't start the installer.
 - **Making the stick erases it.** Copy anything you need off it first.
 
 ## June USB (recommended)
@@ -117,12 +119,38 @@ switch it on and press its boot-menu key straight away (often F12, F11, F9, F2 o
 Esc). Pick the USB stick; if it's listed twice, pick the **UEFI** entry. You get
 one menu, the June Local menu, which starts the graphical installer by itself.
 
-- **Secure Boot** can stay on. There's no key to enroll.
+- **Secure Boot** can stay on. There's no key to enroll. Surface devices and
+  some other recent laptops sold as *Secured-core PCs* first need one Secure
+  Boot setting changed: see the next section.
 - From installer 0.6, the stick also starts on older computers without UEFI
   (legacy BIOS). With 0.5 it needs UEFI, which every laptop from the last ten
   years or so has.
 
 Then follow [`USE_LIVE_INSTALLER.md`](USE_LIVE_INSTALLER.md).
+
+### Surface and other Secured-core laptops
+
+The installer is Debian Linux. It starts with Secure Boot on through a loader
+signed with Microsoft's third-party certificate, which almost every PC trusts.
+Laptops sold as *Secured-core PCs*, including the Surface Pro 8 and later and
+the Surface Laptop 4 and later, come trusting only Windows itself: they skip
+the stick or say it isn't bootable. On a Surface:
+
+1. Shut it down. Hold **Volume Up** and press the power button until the
+   Surface UEFI screen appears.
+2. **Security** → **Secure Boot** → **Change configuration**: choose
+   **Microsoft & 3rd party CA** and press **OK**. Secure Boot stays on.
+3. **Exit** → **Restart now**, and hold **Volume Down** while it starts until
+   the June Local menu appears.
+
+Other Secured-core laptops (several Lenovo ThinkPads from 2022 on, for example)
+have the same switch in their firmware settings, usually called *Allow
+Microsoft 3rd Party UEFI CA*. Windows starts normally with either setting; you
+can switch it back when you're done.
+
+A Surface Pro 9 **with 5G**, and every Surface Pro X, has an ARM processor
+instead of an Intel one. It can't start the installer, however the stick is
+made (Ventoy too); use another laptop.
 
 > **Installer 0.5 and June USB sticks.** Installer 0.5 only recognises Ventoy
 > sticks as the boot stick. Started from a June USB stick, 0.5 installs and
@@ -186,6 +214,7 @@ sudo ./june-usb-cli -device /dev/sdX -update   # replace only the installer
 | "Does not match the ISO; the stick may be faulty" | A file read back differently from what was written. Try another stick; fake-capacity sticks fail this way. |
 | "Eject it before unplugging" on the last screen | A window or program still had the stick open. Close it and use **Eject** in File Explorer or Finder. The stick itself is complete. |
 | The laptop doesn't list the stick in its boot menu | Pick the **UEFI** entry, try another USB port, or check that USB boot is enabled in the firmware settings. |
+| A Surface (or another Secured-core laptop) says the stick isn't bootable, or skips it and starts Windows | Set Secure Boot to **Microsoft & 3rd party CA**: see [Surface and other Secured-core laptops](#surface-and-other-secured-core-laptops). ARM laptops (Surface Pro 9 with 5G, Surface Pro X) can't start the installer; use another laptop. |
 
 How the app works, how to build it and how it's released:
 [`installer/usbtool/README.md`](installer/usbtool/README.md).

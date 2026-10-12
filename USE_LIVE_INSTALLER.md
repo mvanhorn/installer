@@ -242,6 +242,7 @@ start** button. The details panel and the USB log show the last steps.
 | No usable backup drive | Drive is exFAT/NTFS/ext4 and writable; at least 8 GB free; rescan. |
 | Wrong size on a restore image | The image is not a complete 7.8 GB oven backup. |
 | Secure Boot verification error | Ventoy sticks only: enroll Ventoy’s key or disable Secure Boot. June USB sticks start with Secure Boot on. |
+| A Surface (or another Secured-core laptop) says the stick isn't bootable | Set Secure Boot to **Microsoft & 3rd party CA** in the firmware; see [`CREATE_USB.md`](CREATE_USB.md#surface-and-other-secured-core-laptops). ARM laptops (Surface Pro 9 with 5G, Surface Pro X) can't start the installer. |
 | Graphical installer falls back to text | On builds before 2026-10-05 the kiosk log showed `Cannot find Xwayland binary "/usr/bin/Xwayland"`; the current image includes Xwayland and retries the software renderer. Update the USB image, or use the text UI on the older stick. |
 | Job failed part-way | Do not unplug the oven; use **Try again**. If it repeats, save `june-logs/` and ask for help. |
 

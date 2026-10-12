@@ -123,6 +123,9 @@ func run(ctx context.Context, list, all bool, device, isoPath, manifest string, 
 		} else {
 			fmt.Println("Done, but it was not ejected: " + res.EjectError + ". Eject it before unplugging.")
 		}
+		if stick.HostIsARM() {
+			fmt.Println("This computer has an ARM processor, so it can't start the installer; use the stick on an Intel or AMD laptop.")
+		}
 	}
 	return err
 }

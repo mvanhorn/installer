@@ -173,6 +173,13 @@ function releaseList() {
     </details>${note}`;
 }
 
+// An ARM computer can make the stick but can't start the amd64 installer.
+function armNote() {
+  if (!ui.info.arm) return "";
+  const what = ui.info.os === "darwin" ? "This Mac has an Apple chip" : "This computer has an ARM processor";
+  return `<div class="warnline">${MARK.warn}<span><b>${what}, so it can't start the installer.</b> It can make the stick; start the installer on a laptop with an Intel or AMD processor.</span></div>`;
+}
+
 const VIEWS = {
   release() {
     let card;
@@ -202,7 +209,7 @@ const VIEWS = {
       <p class="muted">June USB downloads the latest June Local installer and puts it on a USB stick.
         The stick also keeps room for oven backups, logs and certificates.</p>
       <div class="${ui.releases.length > 1 ? "rels" : "panel"}" style="margin-top:22px">${card}${prog}</div>
-      ${err}
+      ${err}${armNote()}
       <div class="actions">
         ${busy ? `<button class="btn ghost" type="button" data-do="cancel">Cancel</button>`
                : `<button class="btn ember" type="button" data-do="download"${ui.release ? "" : " disabled"}>${icon("down")}${ui.pick ? `Download ${esc(ui.release.version)} and continue` : "Download and continue"}</button>
@@ -306,6 +313,7 @@ const VIEWS = {
       ${ui.result.ejected
         ? `<p class="muted">It has been ejected; you can unplug it now.${iso.bios ? "" : " It starts on UEFI computers; this ISO has no legacy BIOS boot code."}</p>`
         : `<div class="warnline">${MARK.warn}<span><b>Eject it before unplugging.</b> Everything is written and checked, but ${esc(ui.result.ejectError || "the stick could not be ejected automatically")}. Close any windows showing the stick, then use “Eject” in File Explorer (or Finder).</span></div>`}
+      ${armNote()}
       <ol class="done-list">
         <li>Plug the stick into the laptop that will run the installer (not the oven).</li>
         <li>Turn the laptop on and open its boot menu. The key is usually F12, F11, Esc or F2.</li>
@@ -543,7 +551,8 @@ function mockApi() {
   const steps = ["Prepare the stick", "Copy the installer", "Verify the copy", "Make it bootable", "Finish"];
   let cancelled = false;
   return {
-    Info: async () => ({ version: "1.0", os: "windows", guideUrl: "https://project-july.org/setup" }),
+    // "#arm" previews the note an ARM computer shows.
+    Info: async () => ({ version: "1.0", os: "windows", guideUrl: "https://project-july.org/setup", arm: location.hash === "#arm" }),
     Release: async () => { await wait(400); return { version: "v0.7", url: "", sha256: "ac0a86673b7cc7c15d73f7109066baf1a43f7f1f1767555b20d2dacef59438c5", size: 1413529600 }; },
     // "#one" leaves Releases out, to preview the latest.json-only screen.
     Releases: location.hash === "#one" ? undefined : async () => {

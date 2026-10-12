@@ -46,6 +46,9 @@ type Info struct {
 	Version  string `json:"version"`
 	OS       string `json:"os"`
 	GuideURL string `json:"guideUrl"`
+	// ARM is true on an ARM computer (Apple chip, Snapdragon), which can make
+	// the stick but can't start the installer.
+	ARM bool `json:"arm"`
 }
 
 const guideURL = "https://project-july.org/setup"
@@ -78,7 +81,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 
 func (a *App) Info() Info {
 	debugf("Info called by the UI")
-	return Info{Version: stick.ToolVersion, OS: runtime.GOOS, GuideURL: guideURL}
+	return Info{Version: stick.ToolVersion, OS: runtime.GOOS, GuideURL: guideURL, ARM: stick.HostIsARM()}
 }
 
 // Release fetches the current release manifest.

@@ -186,6 +186,7 @@ folder if it does not exist):
 | Ventoy does not list the ISO | Put the ISO on the large exFAT `Ventoy` partition, not the 32 MB `VTOYEFI` partition. Check the `.iso` extension and re-plug the stick. |
 | Ventoy stick is not offered as a backup target | Keep the `Ventoy` label, use exFAT/NTFS (not FAT32), ensure it has free space and is writable. If it still does not appear, use a second USB drive. |
 | Secure Boot verification error | Enroll Ventoy's key with MokManager, or disable Secure Boot. |
+| A Surface (or another Secured-core laptop) skips the stick or says it isn't bootable | First set Secure Boot to **Microsoft & 3rd party CA** in the firmware; see [`CREATE_USB.md`](CREATE_USB.md#surface-and-other-secured-core-laptops). ARM laptops (Surface Pro 9 with 5G, Surface Pro X) can't start the installer. |
 | `No bootable device` | Check the boot order, try the other USB entry (UEFI vs Legacy), and confirm Ventoy installed both partitions. |
 | Two menus confuse users | That is expected: Ventoy first, June Local second. Set `VTOY_MENU_TIMEOUT` to 3 and keep the default image. The June Local menu is where graphical vs text is chosen. |
 | Very slow backup | Use a USB 3 port and stick. The oven's eMMC reads at roughly 8–10 MB/s, so a full backup can take 15–30 minutes. |
