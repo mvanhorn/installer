@@ -1,6 +1,7 @@
 # Generated payload and images
 installer/liveiso/assets/
 *.iso
+*.iso.sha256
 
 # Blobs and secrets: never commit
 *.apk

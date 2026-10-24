@@ -75,6 +75,12 @@ The download filename is always `june-local-live.iso`, so the Ventoy setup
 in the download URL and inside the ISO: boot menu entries, the GUI header,
 the text menu, and every install/backup log.
 
+`build_live_iso.sh` also keeps a versioned local copy,
+`june-local-live-<version>-<build-id>.iso` (with a matching `.sha256`), so
+old builds stay reviewable for bug reports even though the canonical
+`june-local-live.iso` is overwritten by each build. Both are gitignored;
+published R2 objects under `installer/<version>/` are the canonical record.
+
 1. Tag the release commit: `git tag v0.8 && git push origin v0.8`.
    `build_live_iso.sh` stamps `git describe` into `assets/VERSION`, so the
    tagged commit builds as `v0.8`; anything else builds as e.g.

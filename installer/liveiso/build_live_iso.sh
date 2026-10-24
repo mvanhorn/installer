@@ -40,4 +40,14 @@ BUILD_CONTAINER="june-local-liveiso-build"
 "$DOCKER" run --privileged --name "$BUILD_CONTAINER" june-local-liveiso /build/build.sh
 "$DOCKER" cp "$BUILD_CONTAINER:/build/live/live-image-amd64.hybrid.iso" "$OUT"
 "$DOCKER" rm -f "$BUILD_CONTAINER" >/dev/null 2>&1 || true
+
+# Keep a versioned copy so old builds stay reviewable when a bug report comes
+# in.  The canonical june-local-live.iso name is what Ventoy and the USB tool
+# expect; this archive is for local history (the published R2 objects remain
+# the canonical record for users).
+ARCHIVE="$(pwd)/june-local-live-${VERSION}-${BUILD_ID}.iso"
+cp -p "$OUT" "$ARCHIVE"
+( cd "$(pwd)" && sha256sum "${ARCHIVE##*/}" > "${ARCHIVE##*/}.sha256" )
+
 echo "ISO written to $OUT ($VERSION, build $BUILD_ID)"
+echo "Archived as $ARCHIVE"
