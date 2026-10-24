@@ -39,8 +39,8 @@ The heading is **“What would you like to do?”**. There are five tiles:
 
 | Tile | What it does |
 | --- | --- |
-| **Install June Local** | Recommended. Installs the local server, camera bridge, and project certificate. The factory June app keeps working, but talks to June Local. |
-| **Install with your own CA** | Advanced. Creates a private certificate authority on the USB and signs a certificate for the oven’s address. You install the CA on the phone afterwards. |
+| **Connect by IP** | Recommended (the default). No hostname or DNS needed: creates a per-home certificate authority, signs a certificate that includes the oven’s LAN IP, and uses that IP on the phone. Install the CA on the phone afterwards. |
+| **Connect by name (june.local)** | Adds the project certificate authority to the oven’s trust store. The certificate covers `june.local`, `june2.local` and `june3.local`; the JuneDns helper advertises `<name>.local`, and if multicast (mDNS) is blocked you can add a local DNS entry or use **Connect by IP**. The factory June apps keep working and talk to June Local. Install the same CA on the phone afterwards. |
 | **Back up the oven** | Makes a full ~7.8 GB image of the oven’s storage on a USB drive. |
 | **Restore a backup** | Puts a backup image back on the oven. This replaces everything on the oven. |
 | **More / Phone setup** | Setup guide, text mode, restart, or phone access. |
@@ -53,15 +53,24 @@ The status line at the top says whether the oven is connected:
 
 Asset: `website-assets/png/09-installer-ui.png`.
 
-## 3. Basic install (recommended)
+## 3. Connect by name (june.local)
 
 ### Options
 
-Choose **Install June Local**. The options screen says:
+Choose **Connect by name (june.local)** if you want the oven reachable by name.
+It adds the project certificate authority to the oven's trust store, so the
+factory June apps accept June Local.
 
-> **Install June Local on this oven**
-> The oven keeps June's certificate and its factory messaging app, so the June
-> app works as before, but talks to June Local instead of June's cloud.
+The certificate covers **`june.local`**, **`june2.local`** and
+**`june3.local`** (use `june2`/`june3` for a second/third oven). The JuneDns
+helper on the oven advertises `<name>.local`; if multicast (mDNS) is blocked on
+your network, add a local DNS entry or use **Connect by IP** instead.
+
+After the install you install the same CA on the phone: the oven serves it at
+`http://<oven-ip>/local/ca.crt` (the success screen covers the steps). Then set
+the phone app endpoint to `june.local` if it resolves. The stock June app can
+use `api.junelife.com`/`messaging.junelife.com` with a router DNS entry
+(advanced; not needed for the companion app).
 
 **Keep the no-pin patch after a factory reset** is off by default. Turn it on
 only if you want the no-pin patch to survive a factory reset; it stores the
@@ -110,29 +119,42 @@ When it finishes, the screen says **“June Local is installed”** and shows:
 2. Wait 10 seconds, plug the power back in and let the oven start normally.
 3. From a device on the same network, open **`http://<oven-ip>/local`**. You
    should see the June Local status page.
-4. Pair from the June app or Home Assistant. Then close up the oven.
+4. On the phone, download the project CA from **`http://<oven-ip>/local/ca.crt`**
+   and install it: **Settings › Security › Install a certificate › CA
+   certificate** on Android, or install the profile and enable it under
+   **Settings › General › About › Certificate Trust Settings** on iPhone.
+   Without this the phone rejects the oven's certificate.
+5. Set the phone/companion app endpoint to `june.local` (or `june2.local` /
+   `june3.local`) **if it resolves**. If it does not, use **Connect by IP**
+   instead; the basic certificate does not contain the raw IP. The stock June
+   app can use `api.junelife.com`/`messaging.junelife.com` with a router DNS
+   entry (advanced).
+6. Pair from the June app or Home Assistant. Then close up the oven.
 
 If you chose persistence, the no-pin patch is staged in `/system` and applied
 on the oven’s next start.
 
 Asset: `website-assets/png/14-success.png`.
 
-## 4. Custom install (your own CA)
+## 4. Connect by IP (own CA)
 
-Choose **Install with your own CA** when you specifically want a per-home
-certificate authority.
+Choose **Connect by IP** when you do not want to set up a hostname or DNS. This
+is the recommended default for most people: the certificate includes the oven’s
+LAN IP, and the phone uses that IP directly.
 
-1. Enter the **Oven LAN IP** (for example `192.168.1.50`) and a **Hostname**
-   (the current UI prefills `oven.local`; use `june.local` or your own name if
-   you prefer). Reserve the IP for the oven in your router.
-2. The installer creates the CA on the USB stick and signs a certificate for
-   the address you entered.
+1. Enter the **Oven LAN IP** (for example `192.168.1.100`). A hostname is
+   optional (only if you also want a name-based URL). Reserve the IP for the
+   oven in your router; the certificate covers that IP.
+2. The installer creates a per-home CA on the USB stick and signs a certificate
+   for the IP (and hostname, if supplied).
 3. Continue through **Connect the oven** and the progress screen exactly as in
    the basic install.
 4. On success, download the CA and the companion app from the phone QR code
-   (or use the files on the USB). Install the CA on the phone:
-   **Settings › Security › Install a certificate › CA certificate**.
-5. Pair the phone app using the oven address.
+   (or use the files on the USB; the oven also serves the CA at
+   `http://<oven-ip>/local/ca.crt` once it is running). Install the CA on the
+   phone: **Settings › Security › Install a certificate › CA certificate**.
+5. Set the phone/companion app endpoint to the oven’s **IP** and pair. No
+   hostname or DNS is needed.
 
 The generated CA and leaf files are saved under `june-certs/` on the stick's
 data partition (`JUNE` on a June USB stick, `Ventoy` on a Ventoy stick). The custom install also has the **Keep the patch after a factory
@@ -191,7 +213,9 @@ in the header:
 - the laptop and phone must be on the same network;
 - scan the QR code, or type the shown `http://<laptop-ip>/` address;
 - the phone shows the same screens and can start and follow jobs;
-- the phone can download the custom-install CA and the companion app;
+- the phone can download the per-home CA (custom install) and the companion app;
+- after a basic install, get the project CA from the oven at
+  `http://<oven-ip>/local/ca.crt`;
 - **Allow a phone on this network** must be on; anyone who scans the code can
   control the installer, so turn it off when you are done.
 
@@ -250,9 +274,18 @@ Assets: `website-assets/png/10-troubleshooting.png`,
 
 ## 11. After the install
 
+- **A factory reset is no longer fatal.** June Local re-creates the oven's local
+  identity on the next boot, so a reset does not leave the oven unable to
+  connect. A reset still wipes the paired-client roster and `/data` (June Local
+  logs and media), so re-pair your phone/Home Assistant afterwards. An SOS
+  "Factory Reset" may also restore the stock system; if that happens, re-run the
+  installer.
 - The oven reboots normally into June’s UI.
 - Open `http://<oven-ip>/local` from any device on the network to confirm
   June Local is running.
+- Install the CA on the phone: the project CA from
+  `http://<oven-ip>/local/ca.crt` for a basic install, or the per-home CA from
+  the USB (or `http://<oven-ip>/local/ca.crt`) for a custom install.
 - Pair from the June app or Home Assistant.
 - Check the Project July clients page for the companion app and the Home
   Assistant integration.

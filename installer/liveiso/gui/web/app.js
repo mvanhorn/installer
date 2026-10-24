@@ -34,15 +34,15 @@ const GLYPH = {
 /* ---- Copy --------------------------------------------------------------- */
 
 const ACTIONS = {
-  install: {
-    name: "Install June Local", tag: "Recommended",
-    sub: "Keeps June's certificate and the factory app. The quickest way.",
-    steps: ["Options", "Connect oven", "Install"], go: "Install June Local",
-  },
   custom: {
-    name: "Install with your own CA",
-    sub: "Advanced. Creates a certificate authority just for your home.",
+    name: "Connect by IP", tag: "Recommended",
+    sub: "No hostname or DNS needed. Creates a per-home CA and a certificate for the oven's IP.",
     steps: ["Details", "Connect oven", "Install"], go: "Install June Local",
+  },
+  install: {
+    name: "Connect by name (june.local)", tag: "",
+    sub: "Adds the project CA to the oven. The JuneDns helper advertises june.local, june2.local and june3.local; if multicast is blocked, use a local DNS entry or Connect by IP.",
+    steps: ["Options", "Connect oven", "Install"], go: "Install June Local",
   },
   backup: {
     name: "Back up the oven",
@@ -233,20 +233,20 @@ function viewOptions() {
   if (ui.action === "install") {
     body = `
       <h2>Install June Local on this oven</h2>
-      <p class="muted">The oven keeps June's certificate and its factory messaging app, so the June app works as before, but talks to June Local instead of June's cloud.</p>
+      <p class="muted">The oven installs June Local and the project CA in its trust store. The factory June apps keep working and talk to June Local instead of June's cloud; install the same CA on the phone afterwards. The certificate covers <b>june.local</b>, <b>june2.local</b> and <b>june3.local</b>, and the <b>JuneDns</b> helper advertises them on the oven. If multicast (mDNS) is blocked, add a local DNS entry for the name or use <b>Connect by IP</b> instead.</p>
       <div class="fields">
-        <div class="field"><label for="f-name">Oven name</label><input id="f-name" name="name" autocomplete="off" spellcheck="false" value="${esc(f.name == null ? "june" : f.name)}"><div class="hint">Used for the oven's mDNS name &lt;name&gt;.local. The prepackaged certificate covers june.local; use the oven IP for HTTPS with a custom name.</div></div>
+        <div class="field"><label for="f-name">Oven name</label><input id="f-name" name="name" autocomplete="off" spellcheck="false" value="${esc(f.name == null ? "june" : f.name)}"><div class="hint">The JuneDns helper advertises the oven as june.local, june2.local or june3.local (the certificate covers all three). If multicast (mDNS) is blocked, add a local DNS entry for the name or use Connect by IP.</div></div>
       </div>
       <div class="opts">
         ${opt("persist", "Keep June Local after a factory reset", "Stores the June Local patches (cook modes, camera, light and messaging) in /system so a factory reset keeps them. Off by default.", f.persist)}
       </div>`;
   } else if (ui.action === "custom") {
     body = `
-      <h2>Your oven's address</h2>
-      <p class="muted">A private certificate authority is created on this USB stick. It signs a certificate for your oven's address, and you install the CA on your phone afterwards.</p>
+      <h2>Connect by IP</h2>
+      <p class="muted">A private certificate authority is created on this USB stick. The certificate includes the oven's IP, so there is no hostname or DNS to set up; use the IP on the phone. Install the CA on the phone afterwards.</p>
       <div class="fields">
-        <div class="field"><label for="f-ip">Oven LAN IP</label><input id="f-ip" name="ip" inputmode="decimal" autocomplete="off" placeholder="192.168.1.50" value="${esc(f.ip || "")}"><div class="hint">Reserve this address for the oven in your router.</div></div>
-        <div class="field"><label for="f-host">Hostname</label><input id="f-host" name="host" autocomplete="off" spellcheck="false" value="${esc(f.host == null ? "june.local" : f.host)}"></div>
+        <div class="field"><label for="f-ip">Oven LAN IP</label><input id="f-ip" name="ip" inputmode="decimal" autocomplete="off" placeholder="192.168.1.100" value="${esc(f.ip || "")}"><div class="hint">Reserve this address for the oven in your router. The IP is written into the certificate.</div></div>
+        <div class="field"><label for="f-host">Hostname (optional)</label><input id="f-host" name="host" autocomplete="off" spellcheck="false" value="${esc(f.host == null ? "june.local" : f.host)}"><div class="hint">Only needed if you also want to use a name; the IP works on its own. The JuneDns helper advertises &lt;host&gt;.local; add a local DNS entry if multicast (mDNS) is blocked.</div></div>
       </div>
       <div class="opts">
         ${opt("persist", "Keep June Local after a factory reset", "Stores the June Local patches and the per-home CA in /system so a factory reset keeps them.", f.persist)}
@@ -492,16 +492,20 @@ function qrCard(target, title, sub) {
 
 function infoQR(j) {
   if (!S.local) return "";
-  // Custom installs know the oven's LAN IP, so the QR keeps working even on
-  // networks where mDNS (*.local) is not resolved.  Basic installs fall back
-  // to the hostname.
-  const host = (j.params.ip || "").trim() || j.params.host || ((j.params.name || "june") + ".local");
-  return `<div class="dl">${qrCard("oven", "June Local status page", `http://${esc(host)}/local — scan from a device on the same network.`)}${qrCard("guide", "Setup guide", "project-july.org/setup — phone setup and client downloads.")}</div>`;
+  // The custom install knows the oven's LAN IP, so the QR keeps working. Basic
+  // installs do not know the IP; their name is advertised by the JuneDns helper
+  // on the oven, and falls back to the IP/local DNS entry if multicast is blocked.
+  const host = (j.params.ip || "").trim() || (j.params.host || "").trim();
+  const guide = qrCard("guide", "Setup guide", "project-july.org/setup — phone setup and client downloads.");
+  if (!host) {
+    return `<div class="dl"><div class="dl-card"><div><div class="opt-title">Oven status page</div><div class="opt-sub">Open <b>http://&lt;oven-ip&gt;/local</b> from a device on the same network. The <b>JuneDns</b> helper advertises <b>http://june.local/local</b>; if multicast is blocked, add a local DNS entry or use the IP.</div></div></div>${guide}</div>`;
+  }
+  return `<div class="dl">${qrCard("oven", "June Local status page", `http://${esc(host)}/local — scan from a device on the same network.`)}${guide}</div>`;
 }
 
 function downloadsHTML(j) {
   const files = [];
-  if (j.action === "custom" && S.files["ca.crt"]) files.push(["ca.crt", "Your home's CA certificate", "Install it on the phone: Settings › Security › Install a certificate › CA certificate.", "your CA certificate"]);
+  if (S.files["ca.crt"]) files.push(["ca.crt", "June Local CA certificate", "Install it on the phone: Settings › Security › Install a certificate › CA certificate (iOS: install the profile, then enable full trust). Use the oven's IP (Connect by IP), or june.local / june2.local / june3.local (Connect by name; the JuneDns helper advertises them — add a local DNS entry if multicast is blocked). The stock June app can use api.junelife.com/messaging.junelife.com with router DNS (advanced).", "the CA certificate"]);
   if (S.files["companion.apk"]) files.push(["companion.apk", "Companion app", "Install it, then set the oven's address as the endpoint.", "the companion app"]);
   if (!files.length) return "";
   if (!S.local) {
@@ -639,9 +643,9 @@ function renderFilesSheet() {
     ${sheetHead("Phone setup")}
     <div class="menu">
       ${f["companion.apk"] ? `<a class="btn" href="/files/companion.apk">Download the companion app</a>` : `<p class="muted">The companion app is not on this installer.</p>`}
-      ${f["ca.crt"] ? `<a class="btn ghost" href="/files/ca.crt">Download your home's CA certificate</a>` : ""}
+      ${f["ca.crt"] ? `<a class="btn ghost" href="/files/ca.crt">Download the June Local CA certificate</a>` : ""}
     </div>
-    <p class="muted small" style="margin-top:16px">After installing the app, set the endpoint to your oven's address. If you used your own CA, install the certificate under Settings › Security › Install a certificate › CA certificate.</p>
+    <p class="muted small" style="margin-top:16px">After installing the app, set the endpoint to the oven's IP (Connect by IP), or june.local / june2.local / june3.local (Connect by name; the JuneDns helper advertises them — add a local DNS entry or use the IP if multicast is blocked). Install the June Local CA certificate under Settings › Security › Install a certificate › CA certificate (iOS: install the profile, then enable full trust). The stock June app can use api/messaging with router DNS (advanced).</p>
   </div>`;
 }
 

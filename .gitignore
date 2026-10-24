@@ -7,6 +7,8 @@ installer/liveiso/assets/
 # Our own tiny light-bridge helper is source-built and belongs in the payload;
 # all June-licensed APKs remain ignored.
 !onoven/oven-light/OvenLight_signed.apk
+# apktool intermediate build tree for the JuneDns helper
+onoven/june-dns/build/
 *.p12
 *.jks
 *.keystore

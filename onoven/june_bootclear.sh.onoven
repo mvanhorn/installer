@@ -6,6 +6,9 @@
 # starts the server.  After a factory reset the stock boot image is restored
 # from the SAP payload and that service may be absent, so start june-local
 # from here when nothing else has.
+#
+# It also starts the June Local DNS helper (com.july.dns/.MdnsService) after
+# boot, so the oven advertises <name>.local over mDNS (installer/onoven/june-dns).
 
 LOG_TAG="junebootclear"
 LOG_NAME="${0}:"
@@ -38,6 +41,41 @@ start_june_local_fallback() {
     --append >> /data/june/logs/june-local-boot.log 2>&1 &
 }
 
+# mDNS name: the installer-selected host name lives in /system/etc/june_hostname
+# (without the .local suffix). june_reaper sets net.hostname from it before
+# Android starts; re-assert it here and set the kernel host name too, because
+# Android's mdnsd derives the mDNS host name (the A record clients resolve for
+# <name>.local) from the device host name. The NsdServiceInfo host field is not
+# sent to mdnsd on Android 5.0.1, so this is what makes the name match.
+apply_oven_hostname() {
+  HN="$(cat /system/etc/june_hostname 2>/dev/null)"
+  HN="${HN%.local}"
+  [ -n "$HN" ] || HN="june"
+  setprop net.hostname "$HN" 2>/dev/null && logi "net.hostname set to $HN"
+  if /system/bin/busybox hostname "$HN" 2>/dev/null; then
+    logi "kernel hostname set to $HN"
+  elif ( echo "$HN" > /proc/sys/kernel/hostname ) 2>/dev/null; then
+    logi "kernel hostname set to $HN (procfs)"
+  else
+    logi "could not set kernel hostname; mDNS name may not match $HN"
+  fi
+}
+
+# Start the June Local DNS helper (system app staged by the installer). It
+# registers a "June Local" _http._tcp service, which starts Android's mdnsd and
+# keeps it running (START_STICKY); one start per boot is enough.
+start_mdns_helper() {
+  if ! /system/bin/pm path com.july.dns >/dev/null 2>&1; then
+    logi "com.july.dns not installed; skipping mDNS helper"
+    return 0
+  fi
+  if /system/bin/am startservice --user 0 -n com.july.dns/.MdnsService >/dev/null 2>&1; then
+    logi "mDNS helper start requested (com.july.dns/.MdnsService)"
+  else
+    loge "could not start com.july.dns/.MdnsService"
+  fi
+}
+
 # Wait for boot_completed so the dedicated junelocal service (when present)
 # has already started; the running check then avoids a duplicate.
 (
@@ -49,6 +87,8 @@ start_june_local_fallback() {
   done
   sleep 5
   start_june_local_fallback
+  apply_oven_hostname
+  start_mdns_helper
 ) &
 
 logi "june-local fallback scheduled"

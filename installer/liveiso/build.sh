@@ -464,7 +464,7 @@ It signs a unique oven certificate for your LAN IP and hostname, installs that C
 
 Oven LAN IP and hostname:"
   result="$(dialog --stdout --no-cancel --visit-items --form "$form_text" 0 0 3 \
-    "Oven LAN IP (e.g. 192.168.1.50):" 1 1 "192.168.1." 1 35 36 0 \
+    "Oven LAN IP (e.g. 192.168.1.100):" 1 1 "192.168.1.100" 1 35 36 0 \
     "Hostname:" 2 1 "june.local" 2 35 36 0)" || return 1
   clear
   ip="$(printf '%s\n' "$result" | sed -n '1p')"
@@ -609,7 +609,7 @@ if command -v whiptail >/dev/null 2>&1; then
     case "$CHOICE" in
       install)
         oven_name="$(whiptail --title "June Local installer" \
-          --inputbox "Name for this June oven, used for its mDNS address <name>.local:\n\nNote: this basic install keeps June's prepackaged certificate, which does not cover this name. Use the oven's IP (or turn TLS verification off) for HTTPS; the .local name is for convenience and plain HTTP. The custom install issues a certificate for the name.\n\nOptional for other devices: point api.junelife.com and messaging.junelife.com at the oven's IP in your DNS (or hosts file). The prepackaged certificate matches those names, so even stock June clients verify there." \
+          --inputbox "Name for this June oven, used for its mDNS address <name>.local:\n\nThe basic install adds the project CA to the oven's trust store; the certificate covers june.local, june2.local and june3.local. The JuneDns helper advertises <name>.local; if multicast (mDNS) is blocked, add a local DNS entry or use Connect by IP instead.\n\nOptional for other devices: point api.junelife.com and messaging.junelife.com at the oven's IP in your DNS (or hosts file). The prepackaged certificate matches those names, so even stock June clients verify there." \
           17 78 "june" --ok-button "Next" --cancel-button "Back" 3>&1 1>&2 2>&3)" || continue
         oven_name="${oven_name:-june}"
         persist_flag=""
@@ -698,24 +698,25 @@ if command -v whiptail >/dev/null 2>&1; then
 else
   banner
   echo
-  echo "1) Install June Local (recommended)"
-  echo "2) Install with per-home CA + leaf (custom)"
+  echo "1) Connect by name (june.local)"
+  echo "2) Connect by IP (recommended; per-home CA)"
   echo "3) Backup oven to USB (needs 8 GB free)"
   echo "4) Restore oven from USB backup"
   echo "5) Check USB / disk status"
   echo "6) Exit to a shell"
   echo "7) Exit installer and reboot"
   echo
-  read -rp "Choice [1]: " choice
-  case "${choice:-1}" in
+  read -rp "Choice [2]: " choice
+  case "${choice:-2}" in
     1)
       read -rp "Name for this June oven [june]: " oven_name
       oven_name="${oven_name:-june}"
-      echo "Note: this basic install keeps June's prepackaged certificate, which does not"
-      echo "cover this name - use the oven's IP (or disable TLS verification) for HTTPS."
-      echo "The .local name works for mDNS and plain HTTP; the custom install covers it in the certificate."
-      echo "Optional: point api.junelife.com and messaging.junelife.com at the oven's IP in"
-      echo "your DNS or hosts file - the prepackaged certificate matches those names."
+      echo "Note: this basic install adds the project CA to the oven's trust store. The"
+      echo "certificate covers june.local, june2.local and june3.local, and the JuneDns"
+      echo "helper advertises <name>.local. If multicast (mDNS) is blocked, add a local"
+      echo "DNS entry or use Connect by IP (option 2)."
+      echo "Optional (advanced): the stock June app can use api.junelife.com and"
+      echo "messaging.junelife.com with a router DNS entry pointing at the oven."
       echo "Connect the oven, hold SW2, and power it on."
       echo "Once patching starts the oven fans spin up faster and keep spinning while it works;"
       echo "this may take up to about 2 minutes."
@@ -724,7 +725,8 @@ else
       if run_install prepackaged "$oven_name"; then
         echo "Success. Unplug the oven power and the USB cable."
         echo "TEST NOW: power it back on, then open http://<oven-ip>/local to confirm"
-        echo "June Local, and pair from the June app / Home Assistant."
+        echo "June Local. Install the CA from http://<oven-ip>/local/ca.crt on the phone,"
+        echo "then pair from the June app / Home Assistant."
         echo "OR: close/reassemble the oven first - it is ready after the next normal power-on."
       else
         echo "Install did not finish. Log: $INSTALL_LOG" >&2
@@ -732,10 +734,10 @@ else
       fi
       ;;
     2)
-      echo "Custom CA mode: generates a private CA, signs a unique oven certificate"
-      echo "for your LAN IP/hostname, and leaves ca.crt for the phone."
+      echo "Connect by IP: generates a private CA and a certificate for your LAN IP."
+      echo "Use the IP on the phone; no hostname or DNS is needed."
       read -rp "Oven LAN IP: " oven_ip
-      read -rp "Hostname (optional): " oven_host
+      read -rp "Hostname (optional; for a name-based URL too): " oven_host
       echo "Connect the oven, hold SW2, and power it on."
       echo "Once patching starts the oven fans spin up faster and keep spinning while it works;"
       echo "this may take up to about 2 minutes."
@@ -744,7 +746,8 @@ else
       if run_install generate "${oven_ip:?}" "${oven_host:-june.local}"; then
         echo "Success. Unplug the oven power and the USB cable."
         echo "TEST NOW: power it back on, then open http://<oven-ip>/local to confirm"
-        echo "June Local, and pair from the June app / Home Assistant."
+        echo "June Local. Install the CA from http://<oven-ip>/local/ca.crt on the phone,"
+        echo "then pair from the June app / Home Assistant."
         echo "OR: close/reassemble the oven first - it is ready after the next normal power-on."
       else
         echo "Install did not finish. Log: $INSTALL_LOG" >&2

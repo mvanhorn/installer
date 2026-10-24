@@ -6,14 +6,14 @@
 # not fail during that early-boot window.
 #
 # Usage:
-#   JUNE_HOSTNAME=oven.june.local JUNE_IP_SAN=192.168.1.75 ./generate_certs.sh /path/out
+#   JUNE_HOSTNAME=oven.june.local JUNE_IP_SAN=192.168.1.100 ./generate_certs.sh /path/out
 #   # or under a shared CA (public cert + key you hold):
 #   JUNE_CA_CERT=/certs/ca.crt JUNE_CA_KEY=/certs/ca.key ./generate_certs.sh /path/out
 set -euo pipefail
 
 OUT_DIR="${1:-./certs}"
 HOSTNAME="${JUNE_HOSTNAME:-june.local}"
-IP_SAN="${JUNE_IP_SAN:-}"          # optional bare-IP SAN, e.g. 192.168.1.75
+IP_SAN="${JUNE_IP_SAN:-}"          # optional bare-IP SAN, e.g. 192.168.1.100
 CA_CERT="${JUNE_CA_CERT:-}"        # optional shared CA public cert
 CA_KEY="${JUNE_CA_KEY:-}"          # optional shared CA private key
 VALIDITY_DAYS="${JUNE_VALIDITY_DAYS:-3650}"

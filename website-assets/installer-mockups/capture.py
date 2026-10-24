@@ -33,12 +33,14 @@ PORT = int(os.environ.get("MOCK_PORT", "8765"))
 BASE = f"http://127.0.0.1:{PORT}"
 VERSION = os.environ.get("JUNE_VERSION", "0.7")
 BUILD_ID = os.environ.get("JUNE_BUILD_ID", "20261011-1353-1d65c317")
+# Re-render for a release with JUNE_VERSION=<version> JUNE_BUILD_ID=<build>, e.g.
+# JUNE_VERSION=0.8 JUNE_BUILD_ID=<0.8 build id> .venv/bin/python capture.py
 
 STAGES = [
     ("01-home.png", "Installer home",
      "June Local installer home. The header shows the version and build; the tiles are Install June Local, Install with your own CA, Back up, Restore and More."),
     ("02-basic-options.png", "Basic install options",
-     "Basic install: the oven name (default june) and the persistence option. The certificate and factory messaging app stay in place."),
+     "Basic install: the oven name (default june) and the persistence option. The project CA is added to the oven's trust store and the factory messaging app stays in place."),
     ("03-basic-persistence.png", "Basic install with persistence",
      "Persistence selected: 'Keep June Local after a factory reset' stages the cook-modes, camera, light and messaging patches in /system so a factory reset keeps them."),
     ("04-custom-options.png", "Custom install options",
@@ -153,7 +155,7 @@ def main() -> None:
             page.wait_for_timeout(300)
             shot(page, "04-custom-options.png")
 
-            page.fill("#f-ip", "192.168.1.75")
+            page.fill("#f-ip", "192.168.1.100")
             page.click("#next")
             page.wait_for_selector(".connect", timeout=10000)
             page.wait_for_timeout(400)

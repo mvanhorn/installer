@@ -32,8 +32,12 @@ const (
 	statusErrorRing       = 20
 )
 
+// appVersion/appCommit/appBuild describe the june-local *server* build and are
+// set by the Makefile. The installer has its own version/build in install.json
+// (install.installer_version / install.build_id); the two are versioned
+// separately and must not be conflated on the status page.
 var (
-	appVersion   = "0.5"
+	appVersion   = "0.8"
 	appCommit    = "dev"
 	appBuild     = "dev"
 	processStart = time.Now()
@@ -69,13 +73,26 @@ type VersionStatus struct {
 	Restarts      int    `json:"restarts"`
 }
 
+// Identity is the local oven identity as the status page sees it. The token
+// itself is never exposed: TokenPrefix is a short display form and TokenSource
+// says where the token record came from. AccountPresent is the gate that
+// matters -- it is the com.junelife.user row the oven's messaging app reads.
+type Identity struct {
+	AccountPresent bool   `json:"account_present"`
+	AccountName    string `json:"account_name,omitempty"`
+	TokenType      string `json:"token_type,omitempty"`
+	TokenSource    string `json:"token_source"`
+	TokenPrefix    string `json:"token_prefix,omitempty"`
+}
+
 type OvenStatus struct {
-	Connection          string `json:"connection"`
-	LastFrameAgeSeconds int64  `json:"last_frame_age_seconds"`
-	Model               string `json:"model"`
-	Android             string `json:"android"`
-	SystemSlot          string `json:"system_slot"`
-	CollectorMounted    bool   `json:"collector_mounted"`
+	Connection          string   `json:"connection"`
+	LastFrameAgeSeconds int64    `json:"last_frame_age_seconds"`
+	Model               string   `json:"model"`
+	Android             string   `json:"android"`
+	SystemSlot          string   `json:"system_slot"`
+	CollectorMounted    bool     `json:"collector_mounted"`
+	Identity            Identity `json:"identity"`
 }
 
 type CookStatus struct {
@@ -375,6 +392,7 @@ func refreshStatus(hub *Hub, cfg *Config) {
 	}
 	d.Oven.Android = androidVersion()
 	d.Oven.SystemSlot, d.Oven.CollectorMounted = systemSlot()
+	d.Oven.Identity = IdentityStatusFor(cfg)
 	d.Camera = cameraStatus(cfg)
 	d.Light = lightStatusSnapshot()
 	if _, err := os.Stat("/system/app/JuneLight/JuneLight.apk"); err == nil {
@@ -651,6 +669,16 @@ func buildProblems(d StatusData) []Problem {
 	add := func(sev, id, title, detail, fix string) {
 		out = append(out, Problem{Severity: sev, ID: id, Title: title, Detail: detail, Fix: fix})
 	}
+	if !d.Cert.CAInSystemStore && strings.Contains(d.Cert.Issuer, "*.junelife.com") {
+		add("red", "cert-untrusted", "Oven does not trust the served certificate",
+			"The served chain's issuer is the project test CA (*.junelife.com), and that CA is not in the oven's trust store. A clean oven's stock June apps reject the TLS handshake, so the oven never opens its socket.",
+			"Reinstall with 'Install with your own CA' (or install the project CA in the oven's trust store). The basic test chain cannot validate on a clean oven.")
+	}
+	if !d.Oven.Identity.AccountPresent {
+		add("red", "identity-missing", "Oven identity is missing",
+			"The June account row that the oven's JuneCloudMessaging app reads for its Authorization token is not in /data/system/users/0/accounts.db. Without it the app sends no token, never opens its messaging socket, and the oven stays disconnected even when the certificate, components and local server are all correct. A factory reset (or a restore that missed /data) wipes this row.",
+			"Reboot the oven so the pre-Android identity ensure can reinstall the seed account, then check /data/june/logs/identity.log. If it is still missing, reinstall from the current USB image (it pre-seeds /system/etc/june/identity in both system slots). june-local cannot create the row at runtime, and restoring a full /data backup is only a workaround.")
+	}
 	if d.Oven.Connection != "connected" {
 		add("red", "oven-disconnected", "Oven not connected",
 			"The relay has no live connection from the oven.",
@@ -734,7 +762,9 @@ func readTrimmed(path string) string {
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(b))
+	// /proc/device-tree/model is NUL-terminated; TrimSpace alone leaves the
+	// trailing \x00 in the JSON and on the status page.
+	return strings.Trim(string(b), "\x00 \t\r\n")
 }
 
 func androidVersion() string {

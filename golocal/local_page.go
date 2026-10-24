@@ -22,7 +22,12 @@ func handleLocalPage(hub *Hub, cfg *Config, w http.ResponseWriter, r *http.Reque
 	jsonText := strings.ReplaceAll(string(jb), "</", "<\\/")
 	headline, sev := worstProblem(d)
 	page := localPageHTML
+	installerVersion := d.Install.InstallerVersion
+	if installerVersion == "" {
+		installerVersion = "unknown"
+	}
 	page = strings.ReplaceAll(page, "{{VERSION}}", html.EscapeString(appVersion))
+	page = strings.ReplaceAll(page, "{{INSTALLER_VERSION}}", html.EscapeString(installerVersion))
 	page = strings.ReplaceAll(page, "{{JSON}}", jsonText)
 	page = strings.ReplaceAll(page, "{{HEADLINE}}", html.EscapeString(headline))
 	page = strings.ReplaceAll(page, "{{HEADLINE_CLASS}}", sev)

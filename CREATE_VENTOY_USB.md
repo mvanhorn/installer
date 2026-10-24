@@ -61,9 +61,10 @@ installer. It is written so a website author can turn it into a tutorial.
    sha256sum june-local-live.iso
    ```
 
-   Compare the result with the hash shown on the release page. The 0.7
-   release build `20261011-1353-1d65c317` has
-   SHA256 `ac0a86673b7cc7c15d73f7109066baf1a43f7f1f1767555b20d2dacef59438c5`.
+   Compare the result with the hash shown on the release page and in
+   <https://downloads.project-july.org/installer/latest.json> (the same values
+   June USB checks). The 0.8 release is tagged `v0.8`; its build id and SHA256
+   are published with the release. Never trust a hash from anywhere else.
    The website should always show the current release's hash.
 
 ## Step 2 — Install Ventoy (Windows)

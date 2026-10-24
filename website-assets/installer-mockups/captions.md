@@ -1,11 +1,14 @@
 # June Local installer mockups
 
 Rendered from the real installer UI (version 0.7, build 20261011-1353-1d65c317).
+Historical: these PNGs are from the 0.7 UI; re-render with
+`JUNE_VERSION=0.8 JUNE_BUILD_ID=<0.8 build id> .venv/bin/python capture.py`
+before the 0.8 site uses them.
 
 | File | Stage | What it shows |
 | --- | --- | --- |
 | `png/01-home.png` | Installer home | June Local installer home. The header shows the version and build; the tiles are Install June Local, Install with your own CA, Back up, Restore and More. |
-| `png/02-basic-options.png` | Basic install options | Basic install: the oven name (default june) and the persistence option. The certificate and factory messaging app stay in place. |
+| `png/02-basic-options.png` | Basic install options | Basic install: the oven name (default june) and the persistence option. The project CA is added to the oven's trust store and the factory messaging app stays in place. |
 | `png/03-basic-persistence.png` | Basic install with persistence | Persistence selected: 'Keep June Local after a factory reset' stages the cook-modes, camera, light and messaging patches in /system so a factory reset keeps them. |
 | `png/04-custom-options.png` | Custom install options | Custom install with a per-home CA: the oven LAN IP and hostname. The hostname defaults to june.local. |
 | `png/05-connect-waiting.png` | Connect the oven (waiting) | Steps on the left, the USB/SW2 illustration on the right, and the oven-found box below. Waiting for RCM mode. |

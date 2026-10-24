@@ -7,19 +7,41 @@
 #
 # What it installs:
 #   /system/xbin/june-local          static ARMv7 Go server
-#   /system/etc/june_leaf.crt        TLS chain (real GoDaddy *.junelife.com leaf)
+#   /system/etc/june_leaf.crt        TLS chain (custom: per-home leaf+CA; basic: bundled project chain)
 #   /system/etc/june_leaf.key        TLS leaf private key (0600)
+#   /system/etc/security/cacerts/$CA_HASH.0
+#                                    CA that signs the served chain, installed as
+#                                    a trust anchor (custom: per-home CA; basic:
+#                                    the project CA).  Without it a clean oven
+#                                    rejects june-local's TLS certificate.
+#   /system/etc/june_ca.crt          the same CA on its own, served at
+#                                    /local/ca.crt for the phone to install
 #   /system/etc/hosts                api/messaging -> 127.0.0.1
 #   /data/june/media                 live-view JPEG directory
 #   /data/june/logs                  server log + JSONL directory
 #   /system/bin/june_bootclear.sh    force-adb only (no server launch)
 #   /system/etc/june/jcm_nopin.apk or /data/june/jcm_nopin.apk
 #       staged patched JCM for the post-boot jcm_apply service
+#   /system/app/JuneDns/JuneDns.apk  June Local DNS (mDNS) helper app
+#   /system/etc/june/identity/token  per-oven June account token (v2:..., 0644)
+#   /system/etc/june/identity/accounts_seed.db
+#       Android AccountManager DB seed; june_reaper installs it before Android
+#       starts when /data has no June account row (factory-reset recovery)
+#   /system/etc/june/identity/identity.json
+#       copy of the /data identity record for the boot-time ensure
+#   /data/june/identity.json         local oven identity record (0600; holds the token)
 #   LNX/boot partition               boot_junelocal_init.img (dedicated init service)
 #
 # Optional env overrides:
-#   CERT_SRC / KEY_SRC / BIN_SRC / JCM_SRC / BOOT_SRC
+#   CERT_SRC / KEY_SRC / CA_SRC / CA_HASH / BIN_SRC / JCM_SRC / BOOT_SRC
 #   FLASH_BOOT=0   skip flashing the boot partition (LNX)
+#   INSTALL_MODE=basic|custom and CA_MODE=project|per-home
+#                  install.sh sets both; they drive install.json and which CA is
+#                  trusted.  If omitted they are inferred from CA_SRC/CA_HASH.
+#   JUNE_IDENTITY_GEN / JUNE_ACCOUNTS_TEMPLATE / PYTHON
+#                  identity seed generator, schema template and interpreter
+#                  (defaults: the files shipped in the payload, then python3)
+#   DNS_SRC        June Local DNS helper APK (default: payload JuneDns_signed.apk)
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -106,6 +128,7 @@ MEDIACAPTURER_SRC="${MEDIACAPTURER_SRC:-}"
 ANALYTICS_SRC="${ANALYTICS_SRC:-}"
 CHEF_SRC="${CHEF_SRC:-}"
 LIGHT_SRC="${LIGHT_SRC:-$SRC_DIR/OvenLight_signed.apk}"
+DNS_SRC="${DNS_SRC:-$SRC_DIR/JuneDns_signed.apk}"
 BOOTCLEAR_SRC="${BOOTCLEAR_SRC:-$SRC_DIR/june_bootclear.sh.onoven}"
 JUNE_REAPER_SRC="${JUNE_REAPER_SRC:-$SRC_DIR/june_reaper.sh.junelocal}"
 COMPANION_STATE_SRC="${COMPANION_STATE_SRC:-$ROOT/local-resources/june-arch/companions_state.json}"
@@ -113,6 +136,25 @@ BOOT_SRC="${BOOT_SRC:-$ROOT/local-resources/june-arch/tools/orchestrator/boot_ju
 FLASH_BOOT="${FLASH_BOOT:-1}"
 JCM_PERSIST="${JCM_PERSIST:-0}"
 CHEF_PERSISTED=0
+# Explicit provenance: install.sh exports INSTALL_MODE=basic|custom and
+# CA_MODE=project|per-home instead of deploy guessing from CA_SRC/CA_HASH.
+# Direct (dev/bench) invocations may omit them; they are resolved below.
+INSTALL_MODE="${INSTALL_MODE:-}"
+CA_MODE="${CA_MODE:-}"
+# June Local per-oven identity: a fresh account token plus the Android
+# AccountManager seed that june_reaper installs before Android starts when /data
+# has no June account row.  The generator and schema template ship in the
+# payload; PYTHON is only resolved when an identity actually has to be built.
+JUNE_IDENTITY_GEN="${JUNE_IDENTITY_GEN:-$SRC_DIR/generate_identity.py}"
+JUNE_ACCOUNTS_TEMPLATE="${JUNE_ACCOUNTS_TEMPLATE:-$SRC_DIR/accounts_template.db}"
+PYTHON="${PYTHON:-}"
+IDENTITY_TMP_DIR=""
+IDENTITY_TOKEN=""
+IDENTITY_SEED=""
+IDENTITY_JSON=""
+IDENTITY_SEED_SOURCE="unavailable"
+ACCOUNT_PRESENT="false"
+identity_token_sha=""
 
 APP_OFF=$((92928 * 512))
 UDA_OFF=$((8039680 * 512))
@@ -146,6 +188,9 @@ require_block_device() {
 cleanup() {
   umount "$APP_MNT" "$UDA_MNT" "$SAP_MNT" 2>/dev/null || true
   losetup -d "${LOOP_APP:-}" "${LOOP_UDA:-}" "${LOOP_SAP:-}" 2>/dev/null || true
+  if [ -n "${IDENTITY_TMP_DIR:-}" ]; then
+    rm -rf "$IDENTITY_TMP_DIR"
+  fi
 }
 trap cleanup EXIT
 
@@ -160,14 +205,22 @@ install_system_files() {
   install -m 0644 "$CERT_SRC" "$mnt/etc/june_leaf.crt"
   install -m 0600 "$KEY_SRC" "$mnt/etc/june_leaf.key"
   if [ -n "$CA_SRC" ]; then
-    # Served at /local/ca.crt.  Custom installs hand out the per-home CA and
-    # also add it to the system store; basic installs hand out the factory
-    # chain and leave the store alone.
+    # Served at /local/ca.crt as the CA alone (not the chain): custom installs
+    # hand out the per-home CA and basic installs the bundled project CA, so the
+    # phone can install either one as a trust anchor.
     install -m 0644 "$CA_SRC" "$mnt/etc/june_ca.crt"
   fi
+  # The CA that signs the served chain must be trusted by the oven itself, in
+  # basic installs too: basic serves a chain whose leaf is issued by the project
+  # CA, which a clean factory oven does not trust.  Without this anchor the
+  # stock June apps reject june-local's TLS handshake and june-local reports
+  # "oven disconnected".  CA_MODE only labels the install in install.json; both
+  # modes install the anchor whenever the caller provides CA_SRC and its
+  # subject_hash_old.
   if [ -n "$CA_SRC" ] && [ -n "$CA_HASH" ]; then
     mkdir -p "$mnt/etc/security/cacerts"
     install -m 0644 "$CA_SRC" "$mnt/etc/security/cacerts/$CA_HASH.0"
+    echo "[+] trusted CA installed on $mnt/etc/security/cacerts/$CA_HASH.0"
   fi
   install -m 0755 "$BOOTCLEAR_SRC" "$mnt/bin/june_bootclear.sh"
   # june_reaper.sh is the stock boot script that mounts the encrypted
@@ -176,15 +229,16 @@ install_system_files() {
   # starts; without a staged patch it behaves exactly like the stock script.
   install -m 0755 "$JUNE_REAPER_SRC" "$mnt/bin/june_reaper.sh"
 
-  # Advertise the configured hostname over mDNS. june_reaper sets net.hostname
-  # from this file at boot and Android's NsdService then publishes
-  # <name>.local (the certificate already carries the matching SAN).
+  # Record the chosen hostname. The optional JuneDns helper app advertises
+  # <name>.local over mDNS (it reads this file); the status page shows the name
+  # and the supplied certificate covers june.local-style names for basic
+  # installs.  If <name>.local does not resolve, use the oven IP.
   hostname_value="${OVEN_HOST:-june}"
   hostname_value="${hostname_value%.local}"
   [ -n "$hostname_value" ] || hostname_value="june"
   printf '%s\n' "$hostname_value" > "$mnt/etc/june_hostname"
   chmod 0644 "$mnt/etc/june_hostname"
-  echo "[*] oven hostname: $hostname_value (will advertise $hostname_value.local)"
+  echo "[*] oven hostname: $hostname_value (use the oven IP if $hostname_value.local does not resolve)"
 
   # The live Android build deletes raw /system/priv-app at boot and mounts the
   # encrypted /system/collector EncFS volume over it, so writing the APK there
@@ -338,6 +392,47 @@ install_system_files() {
     echo "[!] June Light Bridge APK not found at $LIGHT_SRC; interior light wake disabled" >&2
   fi
 
+  # June Local DNS: tiny helper app that advertises <hostname>.local over mDNS.
+  # Optional: a payload without the APK keeps an already-installed helper, so
+  # reinstalling from an older stick never removes it.
+  if [ -f "$DNS_SRC" ]; then
+    mkdir -p "$mnt/app/JuneDns"
+    install -m 0644 "$DNS_SRC" "$mnt/app/JuneDns/JuneDns.apk"
+    dns_dst_sha="$(sha256sum "$mnt/app/JuneDns/JuneDns.apk" | awk '{print $1}')"
+    dns_src_sha="$(sha256sum "$DNS_SRC" | awk '{print $1}')"
+    if [ "$dns_dst_sha" != "$dns_src_sha" ]; then
+      echo "[-] June Local DNS APK write mismatch on $mnt" >&2
+      echo "    src: $dns_src_sha" >&2
+      echo "    dst: $dns_dst_sha" >&2
+      exit 1
+    fi
+    echo "[+] June Local DNS helper installed on $mnt/app/JuneDns/JuneDns.apk"
+  elif [ -f "$mnt/app/JuneDns/JuneDns.apk" ]; then
+    echo "[i] June Local DNS helper not in the payload; keeping the installed one"
+  else
+    echo "[!] June Local DNS helper APK not found at $DNS_SRC; <name>.local will not resolve" >&2
+  fi
+
+  # Per-oven June account seed (both APP and SAP: the SOS factory reset restores
+  # APP from SAP, so a seed kept only in APP would be lost exactly when it is
+  # needed).  june_reaper.sh copies the seed into /data before Android starts
+  # when /data has no June account row; the token is the fallback credential for
+  # the optional JCM token patch and for the bookkeeping identity record.
+  if [ -n "$IDENTITY_TOKEN" ]; then
+    mkdir -p "$mnt/etc/june/identity"
+    printf '%s\n' "$IDENTITY_TOKEN" > "$mnt/etc/june/identity/token"
+    chmod 0644 "$mnt/etc/june/identity/token"
+    if [ -n "$IDENTITY_SEED" ] && [ -f "$IDENTITY_SEED" ]; then
+      install -m 0644 "$IDENTITY_SEED" "$mnt/etc/june/identity/accounts_seed.db"
+    fi
+    if [ -n "$IDENTITY_JSON" ] && [ -f "$IDENTITY_JSON" ]; then
+      # 0600: this record contains the full v2: token (a local secret); root
+      # (deploy, june_reaper, june-local) is the only reader.
+      install -m 0600 "$IDENTITY_JSON" "$mnt/etc/june/identity/identity.json"
+    fi
+    echo "[+] identity seed installed on $mnt/etc/june/identity (source: $IDENTITY_SEED_SOURCE)"
+  fi
+
   if ! grep -qE '^127\.0\.0\.1[[:space:]]+api\.junelife\.com([[:space:]]|$)' "$mnt/etc/hosts"; then
     printf '\n127.0.0.1 api.junelife.com\n' >> "$mnt/etc/hosts"
   fi
@@ -345,6 +440,196 @@ install_system_files() {
     printf '127.0.0.1 messaging.junelife.com\n' >> "$mnt/etc/hosts"
   fi
 
+}
+
+# --- June Local: per-oven identity seed -------------------------------------
+# The June apps read one Android AccountManager account row from
+# /data/system/users/0/accounts.db (type com.junelife.user, token "Full access").
+# A factory reset wipes it, which drops the JCM's bearer token and leaves the
+# oven "disconnected" even when the install itself is correct.  The installer
+# mints a fresh token for this oven and builds accounts_seed.db from the schema
+# template captured from a real oven; june_reaper.sh copies the seed into /data
+# before Android starts when the June row is missing.  Only the captured
+# schema/meta are used: the captured cloud token never ships in the ISO.
+find_python() {
+  local candidate
+  if [ -n "$PYTHON" ] && command -v "$PYTHON" >/dev/null 2>&1; then
+    return 0
+  fi
+  for candidate in python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      PYTHON="$candidate"
+      return 0
+    fi
+  done
+  PYTHON=""
+  return 1
+}
+
+# Write the oven identity record (docs/identity-generation.md §4.3) to
+# $IDENTITY_JSON.  The full token lives here and in /system; install.json only
+# ever gets its hash prefix.
+write_identity_json() {
+  local endpoint_host api_url messaging_url
+  endpoint_host="$install_ip"
+  if [ -z "$endpoint_host" ]; then
+    endpoint_host="${OVEN_HOST:-june.local}"
+    case "$endpoint_host" in
+      *.*) ;;
+      *) endpoint_host="$endpoint_host.local" ;;
+    esac
+  fi
+  api_url="https://$endpoint_host"
+  messaging_url="wss://$endpoint_host"
+  IDENTITY_JSON="$IDENTITY_TMP_DIR/identity.json"
+  cat > "$IDENTITY_JSON" <<EOF
+{
+  "version": 1,
+  "role": "oven",
+  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "generated_by": "june-local-installer/$installer_version",
+  "endpoint": { "api": "$api_url", "messaging": "$messaging_url" },
+  "account": {
+    "name": "June Oven",
+    "type": "com.junelife.user",
+    "token_type": "Full access",
+    "refresh_token_type": "Refresh access",
+    "token": "$IDENTITY_TOKEN"
+  },
+  "oven": {
+    "device_id": null,
+    "model": "meerkat",
+    "serial": null
+  },
+  "notes": "token minted locally at install time; the local relay accepts any bearer token; the Ed25519 signing key is in the ATECC508A and survives a reset"
+}
+EOF
+  # 0600: identity.json carries the full v2: token (a local secret).  Only root
+  # programs read it (deploy, june_reaper, june-local).
+  chmod 0600 "$IDENTITY_JSON"
+}
+
+# Resolve the token and build the seed before the first system partition is
+# written, reusing an identity a previous June Local install put in /system.
+# $1 = the mounted APP system partition.
+prepare_identity_assets() {
+  local mnt="$1" seed_dir existing_token have_seed
+  seed_dir="$mnt/etc/june/identity"
+  IDENTITY_TMP_DIR="$(mktemp -d /tmp/june-identity.XXXXXX)"
+  existing_token=""
+  if [ -f "$seed_dir/token" ]; then
+    existing_token="$(cat "$seed_dir/token" 2>/dev/null || true)"
+  fi
+  have_seed=0
+  if [ -f "$seed_dir/accounts_seed.db" ]; then
+    have_seed=1
+  fi
+  case "$existing_token" in
+    v2:*) IDENTITY_TOKEN="$existing_token" ;;
+  esac
+  if [ -n "$IDENTITY_TOKEN" ] && [ "$have_seed" = "1" ]; then
+    IDENTITY_SEED="$seed_dir/accounts_seed.db"
+    IDENTITY_SEED_SOURCE="preserved"
+    # Work from a temp copy: the source lives on the APP partition, which is
+    # unmounted again before /data is written, and install(1) must not copy the
+    # seed onto itself.  If the copy fails, keep the installed seed as-is.
+    if cp -f "$IDENTITY_SEED" "$IDENTITY_TMP_DIR/accounts_seed.db" 2>/dev/null; then
+      IDENTITY_SEED="$IDENTITY_TMP_DIR/accounts_seed.db"
+    else
+      IDENTITY_SEED=""
+    fi
+    echo "[*] identity: reusing the token + seed already installed in /system"
+  else
+    if ! find_python; then
+      echo "[!] identity: no python3 interpreter found; the per-oven account seed is NOT installed" >&2
+      echo "[!] identity: the oven will depend on an existing /data account row until this is fixed" >&2
+      IDENTITY_TOKEN=""
+      IDENTITY_SEED_SOURCE="unavailable"
+      return 0
+    fi
+    if [ -z "$IDENTITY_TOKEN" ]; then
+      if ! IDENTITY_TOKEN="$("$PYTHON" "$JUNE_IDENTITY_GEN" mint-token 2>/dev/null)"; then
+        echo "[!] identity: could not mint a token with $JUNE_IDENTITY_GEN" >&2
+        IDENTITY_TOKEN=""
+        IDENTITY_SEED_SOURCE="unavailable"
+        return 0
+      fi
+    fi
+    if [ ! -f "$JUNE_ACCOUNTS_TEMPLATE" ] || [ ! -f "$JUNE_IDENTITY_GEN" ]; then
+      echo "[!] identity: accounts template/generator missing from the payload" >&2
+      echo "[!] identity: expected $JUNE_ACCOUNTS_TEMPLATE and $JUNE_IDENTITY_GEN" >&2
+      echo "[!] identity: the token is installed but boot-time account self-heal is unavailable" >&2
+      IDENTITY_SEED_SOURCE="unavailable"
+    else
+      IDENTITY_SEED="$IDENTITY_TMP_DIR/accounts_seed.db"
+      if "$PYTHON" "$JUNE_IDENTITY_GEN" make-seed "$JUNE_ACCOUNTS_TEMPLATE" "$IDENTITY_SEED" "$IDENTITY_TOKEN"; then
+        IDENTITY_SEED_SOURCE="generated"
+      else
+        echo "[!] identity: could not build accounts_seed.db from the template" >&2
+        echo "[!] identity: boot-time account self-heal is unavailable on this install" >&2
+        IDENTITY_SEED=""
+        IDENTITY_SEED_SOURCE="unavailable"
+      fi
+    fi
+  fi
+  identity_token_sha="$(printf '%s' "$IDENTITY_TOKEN" | sha256sum | awk '{print substr($1,1,8)}')"
+  write_identity_json
+  echo "[*] identity: token sha256 prefix ${identity_token_sha:-none}, seed source $IDENTITY_SEED_SOURCE"
+}
+
+# Basic/prepackaged installs serve the bundled project chain, whose leaf is
+# issued by the project's own CN=*.junelife.com CA.  A clean factory oven does
+# not trust that CA, so the install itself must add it to the oven's trust
+# store (install_system_files does) or the oven rejects june-local's TLS
+# certificate after the deploy "succeeds" and never opens its socket.  Fail
+# before writing anything if the payload cannot supply a usable trust anchor:
+# basic mode requires CA_SRC + CA_HASH, CA_SRC must really be a CA certificate
+# and CA_HASH must be its subject_hash_old.  Custom/per-home installs generate
+# their CA at install time (CA_MODE=per-home) and are not checked here.
+preflight_basic_trust_anchor() {
+  local ca_derived ca_text
+  [ "$install_mode" = "basic" ] || return 0
+  if [ -z "$CA_SRC" ] || [ -z "$CA_HASH" ]; then
+    echo "[-] Refusing basic install: no CA trust anchor to install." >&2
+    echo "[-] Basic installs serve the project chain, whose leaf is issued by the" >&2
+    echo "[-] project CN=*.junelife.com CA, and a clean oven does not trust that CA." >&2
+    echo "[-] The anchor is required or the stock June apps reject june-local's TLS" >&2
+    echo "[-] certificate and the oven never connects.  The caller must export CA_SRC" >&2
+    echo "[-] (the project CA) and CA_HASH (its openssl x509 -subject_hash_old)." >&2
+    echo "[-] install.sh does this; a direct dev/bench invocation must pass both." >&2
+    echo "[-] Stopping here; the /system and /data partitions were not modified." >&2
+    exit 1
+  fi
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "[-] Refusing basic install: openssl is required to verify the CA trust anchor." >&2
+    echo "[-] Stopping here; the /system and /data partitions were not modified." >&2
+    exit 1
+  fi
+  if ! ca_text="$(openssl x509 -in "$CA_SRC" -noout -text 2>/dev/null)"; then
+    echo "[-] Refusing basic install: CA_SRC is not a readable X.509 certificate." >&2
+    echo "[-] CA_SRC: $CA_SRC" >&2
+    echo "[-] Stopping here; the /system and /data partitions were not modified." >&2
+    exit 1
+  fi
+  case "$ca_text" in
+    *"CA:TRUE"*) ;;
+    *)
+      echo "[-] Refusing basic install: CA_SRC is not a CA certificate." >&2
+      echo "[-] CA_SRC: $CA_SRC (Basic Constraints CA:TRUE is absent)" >&2
+      echo "[-] Stopping here; the /system and /data partitions were not modified." >&2
+      exit 1
+      ;;
+  esac
+  ca_derived="$(openssl x509 -in "$CA_SRC" -subject_hash_old -noout 2>/dev/null || true)"
+  if [ "$ca_derived" != "$CA_HASH" ]; then
+    echo "[-] Refusing basic install: CA_HASH does not match CA_SRC." >&2
+    echo "[-] CA_SRC:   $CA_SRC" >&2
+    echo "[-] CA_HASH:  $CA_HASH (from caller)" >&2
+    echo "[-] computed: ${ca_derived:-<unreadable>} (openssl x509 -subject_hash_old)" >&2
+    echo "[-] The anchor would be written under the wrong name and the oven would" >&2
+    echo "[-] not trust june-local's certificate.  Stopping here; the /system and /data partitions were not modified." >&2
+    exit 1
+  fi
 }
 
 required_sources=("$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC")
@@ -391,9 +676,65 @@ else
   echo "[i] Chef cook-modes patch not staged (optional)"
 fi
 echo "[*] light: $LIGHT_SRC"
+if [ -f "$DNS_SRC" ]; then
+  echo "[*] june-dns: $DNS_SRC"
+else
+  echo "[i] June Local DNS helper not in the payload (optional; <name>.local needs it)"
+fi
 echo "[*] jcm persistence: $JCM_PERSIST (1 = /system, 0 = /data)"
 echo "[*] companions: $COMPANION_STATE_SRC"
 echo "[*] boot:   $BOOT_SRC (flash=$FLASH_BOOT)"
+
+# --- install provenance (must be resolved before install_system_files runs) ---
+# install.sh exports INSTALL_MODE=basic|custom and CA_MODE=project|per-home.
+# Older or direct invocations may omit them: infer the historical behaviour and
+# say so instead of silently mislabelling the install in install.json.
+if [ -z "$INSTALL_MODE" ]; then
+  if [ -n "$CA_SRC" ]; then
+    INSTALL_MODE="custom"
+  else
+    INSTALL_MODE="basic"
+  fi
+  echo "[!] INSTALL_MODE not set; inferred '$INSTALL_MODE' from CA_SRC (callers should export INSTALL_MODE)" >&2
+fi
+if [ -z "$CA_MODE" ]; then
+  if [ "$INSTALL_MODE" = "custom" ]; then
+    CA_MODE="per-home"
+  else
+    CA_MODE="project"
+  fi
+  echo "[!] CA_MODE not set; inferred '$CA_MODE' from INSTALL_MODE (callers should export CA_MODE)" >&2
+fi
+case "$INSTALL_MODE" in
+  basic|custom) ;;
+  *)
+    echo "[-] INSTALL_MODE must be basic or custom, got '$INSTALL_MODE'" >&2
+    exit 1
+    ;;
+esac
+case "$CA_MODE" in
+  project|per-home) ;;
+  *)
+    echo "[-] CA_MODE must be project or per-home, got '$CA_MODE'" >&2
+    exit 1
+    ;;
+esac
+install_mode="$INSTALL_MODE"
+ca_mode="$CA_MODE"
+if [ "$ca_mode" = "per-home" ] && [ -z "$CA_HASH" ]; then
+  echo "[!] CA_MODE=per-home but CA_HASH is empty: $CA_SRC will be served from /local/ca.crt" >&2
+  echo "[!] but NOT added to the oven's trust store, so the per-home CA will not validate." >&2
+fi
+if [ "$install_mode" = "basic" ] && [ "$ca_mode" != "project" ]; then
+  echo "[!] install_mode=basic with ca_mode=$ca_mode is unusual; basic installs expect ca_mode=project." >&2
+fi
+echo "[*] install mode: $install_mode (ca_mode: $ca_mode)"
+
+# Values shared by the identity record and install.json, resolved before the
+# first system partition is written.
+installer_version="${JUNE_VERSION:-$(cat "$SRC_DIR/VERSION" 2>/dev/null || echo 0.8)}"
+build_id="${JUNE_BUILD_ID:-$(cat "$SRC_DIR/BUILD_ID" 2>/dev/null || echo unknown)}"
+install_ip="${JUNE_OVEN_IP:-}"
 
 # --- LNX/boot partition ---
 if [ "$FLASH_BOOT" = "1" ]; then
@@ -414,6 +755,14 @@ fi
 LOOP_APP="$(losetup -f --show -o "$APP_OFF" "$DEV")"
 mkdir -p "$APP_MNT"
 mount -t ext4 -o rw "$LOOP_APP" "$APP_MNT"
+# Fail before writing to the oven when this basic install cannot install the
+# trust anchor that makes the project chain validate (a clean oven would reject
+# june-local's TLS certificate afterwards).  Custom/per-home installs are
+# exempt: they generate their CA and hash at install time.
+preflight_basic_trust_anchor
+# Mint/collect the per-oven identity and build the account seed before the
+# first system partition is written: the seed is installed on APP and SAP.
+prepare_identity_assets "$APP_MNT"
 install_system_files "$APP_MNT"
 
 sync
@@ -459,6 +808,41 @@ else
   echo "[+] seeded companion registry from payload"
 fi
 
+# --- June Local: per-oven identity on /data ---------------------------------
+# /data/june/identity.json is the operator/status record (not the gate); keep an
+# existing one so a reinstall does not rewrite it.
+if [ -f "$UDA_MNT/june/identity.json" ]; then
+  echo "[+] identity: preserving existing /data/june/identity.json"
+elif [ -n "$IDENTITY_JSON" ] && [ -f "$IDENTITY_JSON" ]; then
+  # 0600: the identity record contains the full v2: token.
+  install -m 0600 "$IDENTITY_JSON" "$UDA_MNT/june/identity.json"
+  echo "[+] identity: wrote /data/june/identity.json (0600)"
+fi
+# Preserve an existing June account row: the oven may already be paired and
+# using its own token.  Only a /data without any June row gets the seed here;
+# the boot-time ensure is the authority for every other case.
+accounts_db="$UDA_MNT/system/users/0/accounts.db"
+if [ -f "$accounts_db" ]; then
+  if grep -aq 'com\.junelife\.user' "$accounts_db" 2>/dev/null; then
+    ACCOUNT_PRESENT="true"
+    echo "[+] identity: existing June account row preserved (left untouched)"
+  else
+    echo "[*] identity: /data accounts.db has no June row; the boot ensure will back it up and install the seed"
+  fi
+elif [ -n "$IDENTITY_SEED" ] && [ -f "$IDENTITY_SEED" ]; then
+  # Fresh/reset /data: seed the row now as well, so the very first boot works
+  # even if the boot ensure cannot run; the ensure re-checks before Android.
+  mkdir -p "$UDA_MNT/system/users/0"
+  install -m 0600 "$IDENTITY_SEED" "$accounts_db"
+  if ! chown 1000:1000 "$accounts_db" 2>/dev/null; then
+    echo "[!] identity: could not chown $accounts_db to 1000:1000" >&2
+  fi
+  rm -f "$accounts_db-journal" "$accounts_db-wal" "$accounts_db-shm"
+  sync
+  ACCOUNT_PRESENT="true"
+  echo "[+] identity: seeded /data/system/users/0/accounts.db from the installer"
+fi
+
 # Provenance for the status page and support: what was installed, how, and
 # the expected hashes of the components june-local reports on.
 comp_sha() {
@@ -468,17 +852,11 @@ case "$(basename "$JCM_SRC")" in
   JuneCloudMessaging_nopin_signed.apk) jcm_sha="$(comp_sha "$JCM_SRC")" ;;
   *) jcm_sha="" ;;
 esac
-install_mode="basic"
-ca_mode="project"
-if [ -n "$CA_SRC" ]; then
-  install_mode="custom"
-  ca_mode="per-home"
-fi
+# install_mode/ca_mode were resolved and validated before the boot/APP writes;
+# they are used verbatim here so basic installs are no longer mislabelled as
+# custom just because CA_SRC is set for the /local/ca.crt download.
 persist="off"
 [ "$JCM_PERSIST" = "1" ] && persist="on"
-installer_version="${JUNE_VERSION:-$(cat "$SRC_DIR/VERSION" 2>/dev/null || echo 0.5)}"
-build_id="${JUNE_BUILD_ID:-$(cat "$SRC_DIR/BUILD_ID" 2>/dev/null || echo unknown)}"
-install_ip="${JUNE_OVEN_IP:-}"
 cat > "$UDA_MNT/june/install.json" <<EOF
 {
   "mode": "$install_mode",
@@ -489,10 +867,16 @@ cat > "$UDA_MNT/june/install.json" <<EOF
   "ca_mode": "$ca_mode",
   "hostname": "${hostname_value:-june}",
   "install_ip": "$install_ip",
+  "identity": {
+    "account_present": $ACCOUNT_PRESENT,
+    "seed_source": "$IDENTITY_SEED_SOURCE",
+    "token_sha256_prefix": "$identity_token_sha"
+  },
   "components": {
     "june-local": "$(comp_sha "$BIN_SRC")",
     "june-camerad": "$(comp_sha "$CAMERAD_SRC")",
     "OvenLight": "$(comp_sha "$LIGHT_SRC")",
+    "JuneDns": "$(comp_sha "$DNS_SRC")",
     "Chef": "$(comp_sha "$CHEF_SRC")",
     "JuneCloudMessaging": "$jcm_sha",
     "Remotes": "$(comp_sha "$REMOTES_SRC")",
@@ -502,7 +886,8 @@ cat > "$UDA_MNT/june/install.json" <<EOF
 }
 EOF
 chmod 0644 "$UDA_MNT/june/install.json"
-echo "[+] wrote /data/june/install.json ($install_mode, persistence $persist)"
+echo "[+] wrote /data/june/install.json ($install_mode, ca_mode $ca_mode, persistence $persist)"
+echo "[+] identity: account_present=$ACCOUNT_PRESENT seed_source=$IDENTITY_SEED_SOURCE token_sha256_prefix=${identity_token_sha:-none}"
 
 case "$(basename "$JCM_SRC")" in
   JuneCloudMessaging_nopin_signed.apk)
@@ -625,5 +1010,11 @@ if [ "$FLASH_BOOT" = "1" ]; then
   sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$BOOT_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"} ${CHEF_SRC:+"$CHEF_SRC"}
 else
   sha256sum "$BIN_SRC" "$CAMERAD_SRC" "$CERT_SRC" "$KEY_SRC" "$JCM_SRC" "$BOOTCLEAR_SRC" "$JUNE_REAPER_SRC" "$COMPANION_STATE_SRC" "$LIGHT_SRC" ${REMOTES_SRC:+"$REMOTES_SRC"} ${MEDIACAPTURER_SRC:+"$MEDIACAPTURER_SRC"} ${ANALYTICS_SRC:+"$ANALYTICS_SRC"} ${CHEF_SRC:+"$CHEF_SRC"}
+fi
+if [ -f "$DNS_SRC" ]; then
+  sha256sum "$DNS_SRC"
+fi
+if [ -n "$IDENTITY_SEED" ] && [ -f "$IDENTITY_SEED" ]; then
+  sha256sum "$IDENTITY_SEED" "$IDENTITY_JSON"
 fi
 echo "[+] power-cycle the oven normally; the junelocal init service starts june-local at boot_completed."

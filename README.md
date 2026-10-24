@@ -3,14 +3,37 @@
 Source for the June Local installer: a minimal Debian live image that
 provisions a June oven to talk to a local June server instead of June's cloud.
 It flashes the oven over USB (RCM/UMS), installs the local service and
-certificates, optionally generates a per-home CA, and can back up or restore
-the oven's eMMC.
+certificates, and can back up or restore the oven's eMMC. The recommended
+install is **Connect by IP**: a per-home CA whose certificate includes the
+oven's IP, so there is no hostname or DNS to set up. **Connect by name
+(june.local)** adds the project certificate authority and covers `june.local`,
+`june2.local` and `june3.local`; the JuneDns helper advertises `<name>.local`,
+and if multicast (mDNS) is blocked you can add a local DNS entry or use
+**Connect by IP** instead.
 
-> **Beta (0.6).** The installer is ready for testers. Make a backup of the
+> **Beta (0.8).** The installer is ready for testers. Make a backup of the
 > oven first: the installer can restore it if anything goes wrong. Report how
 > it went in [issues](https://github.com/prj-july/installer/issues) or at
 > <hello@project-july.org>. The step-by-step guide is at
 > <https://project-july.org/installer/>.
+
+Release notes for the current build: [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
+
+**Factory reset:** June Local re-creates the oven's local identity on the next
+boot, so a reset no longer leaves the oven unable to connect. A reset still
+wipes the paired-client roster and `/data` (June Local logs and media), so
+re-pair your phone/Home Assistant afterwards. An SOS "Factory Reset" may also
+restore the stock system, in which case re-run the installer.
+
+**Connect by IP** is the intended everyday install: it creates a per-home CA and
+a certificate that includes the oven's IP, so the phone can use the IP directly
+with no hostname/DNS. **Connect by name (june.local)** is the name-based
+alternative: it adds the project CA to the oven's trust store and covers
+`june.local`/`june2.local`/`june3.local`; the JuneDns helper advertises
+`<name>.local` — if multicast (mDNS) is blocked, add a local DNS entry or use
+**Connect by IP** instead. In both cases the phone must install the CA before
+it will trust the oven — download it from `http://<oven-ip>/local/ca.crt` after
+the install (see [`USE_LIVE_INSTALLER.md`](USE_LIVE_INSTALLER.md)).
 
 Project July is an independent community project, not affiliated with or
 endorsed by June Life or Weber (see [`NOTICE.md`](NOTICE.md)). June's APKs,
@@ -55,7 +78,8 @@ golocal/             Go source for june-local and june-camerad (make oven,
 onoven/              on-oven deploy scripts
                      deploy_onoven.sh, june_bootclear.sh.onoven,
                      june_reaper.sh.junelocal, oven-light/ (interior-light
-                     bridge APK and smali source)
+                     bridge APK and smali source), june-dns/ (mDNS helper APK
+                     source, built Arch-side)
 packaging/           certificate generation (generate_certs.sh, sign_leaf.sh)
 tools/orchestrator/  boot image builder (build_boot_junelocal_init.py) and the
                      jcm_apply.sh fallback service
@@ -83,6 +107,14 @@ Website tutorial screenshots and mockups are in [`website-assets/`](website-asse
 are not in git (June APKs, certificates/keys, firmware, prebuilt armv7
 binaries, the flashed boot image). See
 `installer/liveiso/PUBLISHING.md` for the exact list.
+
+It also builds the per-oven identity seed template
+(`assets/accounts_template.db`) from a captured oven `accounts.db` (python3 is
+required). The installer mints a fresh token per oven and june_reaper installs
+the account row before Android starts when a factory reset wiped it; without
+the template the rest of the install still works but that reset self-heal is
+unavailable. Point `JUNE_ACCOUNTS_TEMPLATE` at the captured DB if it is not in
+the default location.
 
 ```sh
 cd golocal && make oven camerad && cd ..   # build the armv7 binaries
