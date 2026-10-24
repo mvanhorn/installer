@@ -1,6 +1,6 @@
 # Builds June USB (installer/usbtool) for Windows and macOS.
 #
-# Every PR that touches the tool and every "usb-vX.Y.Z" tag is built and
+# Every PR that touches the tool and every "usb-vX.Y" tag is built and
 # tested unsigned.  A signed release is a manual run on main (Actions > June
 # USB > Run workflow, with the tag to build): it signs (when the secrets below
 # exist) and attaches the files to a draft GitHub release.  Signing runs on
@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to build and sign, e.g. usb-v0.1.2 (push the tag first)"
+        description: "Tag to build and sign, e.g. usb-v1.0 (push the tag first)"
         required: true
 
 permissions:
@@ -69,7 +69,7 @@ jobs:
       - run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
       - name: Build
         run: wails build -platform windows/amd64 -skipbindings -trimpath -ldflags "-X june-usb/stick.ToolVersion=${{ env.TOOL_VERSION }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: June-USB-windows-unsigned
           path: installer/usbtool/build/bin/June-USB.exe
@@ -85,7 +85,7 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: June-USB-windows-unsigned
           path: dist
@@ -126,7 +126,7 @@ jobs:
           $s = Get-AuthenticodeSignature dist\June-USB.exe
           if ($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate) { throw "signature: $($s.Status), timestamp: $($s.TimeStamperCertificate)" }
           $s.SignerCertificate.Subject
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: June-USB-windows
           path: dist/June-USB.exe
@@ -189,7 +189,7 @@ jobs:
           xcrun notarytool submit build/bin/June-USB.dmg --key "$RUNNER_TEMP/key.p8" --key-id "$KEY_ID" --issuer "$ISSUER" --wait
           xcrun stapler staple build/bin/June-USB.dmg
           spctl --assess --type open --context context:primary-signature -v build/bin/June-USB.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: June-USB-macos
           path: installer/usbtool/build/bin/June-USB.dmg
@@ -206,7 +206,7 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: June-USB-{windows,macos}
           path: dist
@@ -218,5 +218,5 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag \
-            --title "June USB ${TAG#usb-}" --notes "Signed builds of June USB. See installer/usbtool/SIGNING.md." \
+            --title "June USB ${TAG#usb-v}" --notes "Signed builds of June USB. See installer/usbtool/SIGNING.md." \
             dist/June-USB.exe dist/June-USB.dmg dist/SHA256SUMS

@@ -108,17 +108,17 @@ active membership to sign new releases.
 
 1. Tag the commit and push the tag. This builds it unsigned, as a check:
    ```sh
-   git tag -a usb-v0.1.2 -m "June USB 0.1.2" && git push origin usb-v0.1.2
+   git tag -a usb-v1.0 -m "June USB 1.0" && git push origin usb-v1.0
    ```
 2. On GitHub: *Actions → June USB → Run workflow*, branch **main**, tag
-   `usb-v0.1.2`. This builds that tag, signs it and attaches `June-USB.exe`,
+   `usb-v1.0`. This builds that tag, signs it and attaches `June-USB.exe`,
    `June-USB.dmg` and `SHA256SUMS` to a **draft** GitHub release.
-   (`gh workflow run june-usb.yml -R prj-july/installer -f tag=usb-v0.1.2`
+   (`gh workflow run june-usb.yml -R prj-july/installer -f tag=usb-v1.0`
    does the same.)
 3. Check the draft, download the three files, then put them on the download
    site, where the website links them:
    ```sh
-   ./publish_usbtool.sh usb-v0.1.2 ~/Downloads/june-usb-release
+   ./publish_usbtool.sh usb-v1.0 ~/Downloads/june-usb-release
    ```
-   That uploads `june-usb/usb-v0.1.2/…` (kept) and replaces
+   That uploads `june-usb/usb-v1.0/…` (kept) and replaces
    `https://downloads.project-july.org/june-usb/June-USB.exe` and `.dmg`.

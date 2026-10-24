@@ -18,7 +18,7 @@ dry=0
 remote="${JUNE_R2_REMOTE:-r2:project-july-downloads}"
 public="https://downloads.project-july.org/june-usb"
 
-[[ "$version" =~ ^usb-v[0-9]+(\.[0-9]+)*$ ]] || { echo "VERSION must look like usb-v0.1.0 (the release tag)" >&2; exit 2; }
+[[ "$version" =~ ^usb-v[0-9]+(\.[0-9]+)*$ ]] || { echo "VERSION must look like usb-v1.0 (the release tag)" >&2; exit 2; }
 for f in June-USB.exe June-USB.dmg SHA256SUMS; do
   [ -f "$dir/$f" ] || { echo "$dir/$f is missing" >&2; exit 2; }
 done

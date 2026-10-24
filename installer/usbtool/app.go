@@ -25,8 +25,9 @@ type App struct {
 	mu        sync.Mutex
 	cancel    context.CancelFunc // running download or hash
 	busy      bool               // writing to a stick
-	release   *stick.Release
-	confirmed string // driveKey of the stick the user agreed to erase
+	release   *stick.Release  // latest.json
+	releases  []stick.Release // releases.json, newest first
+	confirmed string          // driveKey of the stick the user agreed to erase
 	iso       *ISOInfo
 }
 
@@ -36,7 +37,7 @@ type ISOInfo struct {
 	Version  string `json:"version"`
 	SHA256   string `json:"sha256"`
 	Size     int64  `json:"size"`
-	Verified bool   `json:"verified"` // matches the published release
+	Verified bool   `json:"verified"` // matches a published release
 	BIOS     bool   `json:"bios"`     // carries legacy BIOS boot code
 }
 
@@ -45,6 +46,9 @@ type Info struct {
 	Version  string `json:"version"`
 	OS       string `json:"os"`
 	GuideURL string `json:"guideUrl"`
+	// ARM is true on an ARM computer (Apple chip, Snapdragon), which can make
+	// the stick but can't start the installer.
+	ARM bool `json:"arm"`
 }
 
 const guideURL = "https://project-july.org/setup"
@@ -77,7 +81,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 
 func (a *App) Info() Info {
 	debugf("Info called by the UI")
-	return Info{Version: stick.ToolVersion, OS: runtime.GOOS, GuideURL: guideURL}
+	return Info{Version: stick.ToolVersion, OS: runtime.GOOS, GuideURL: guideURL, ARM: stick.HostIsARM()}
 }
 
 // Release fetches the current release manifest.
@@ -92,11 +96,57 @@ func (a *App) Release() (*stick.Release, error) {
 	return rel, nil
 }
 
+// offered is how many releases the app offers (and keeps cached).
+const offered = 3
+
+// Releases fetches every published release, newest first, so the user can
+// pick an older one.
+func (a *App) Releases() ([]stick.Release, error) {
+	rels, err := stick.FetchReleases(a.ctx, releasesURL())
+	if err != nil {
+		return nil, err
+	}
+	a.mu.Lock()
+	a.releases = rels
+	a.release = &rels[0]
+	a.mu.Unlock()
+	// Offer the newest few; a.releases keeps them all, so an ISO the user
+	// picks is still recognised if it is older.
+	if len(rels) > offered {
+		rels = rels[:offered]
+	}
+	return rels, nil
+}
+
 func manifestURL() string {
 	if u := os.Getenv("JUNE_USB_MANIFEST"); u != "" {
 		return u
 	}
 	return stick.DefaultManifestURL
+}
+
+func releasesURL() string {
+	if u := os.Getenv("JUNE_USB_RELEASES"); u != "" {
+		return u
+	}
+	return stick.DefaultReleasesURL
+}
+
+// findRelease returns the known release with this version, or with this
+// SHA256 when version is empty.
+func (a *App) findRelease(version, sum string) *stick.Release {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for i := range a.releases {
+		r := &a.releases[i]
+		if (version != "" && r.Version == version) || (version == "" && r.SHA256 == sum) {
+			return r
+		}
+	}
+	if r := a.release; r != nil && ((version != "" && r.Version == version) || (version == "" && r.SHA256 == sum)) {
+		return r
+	}
+	return nil
 }
 
 func (a *App) startJob() (context.Context, func(), error) {
@@ -130,13 +180,12 @@ type byteEvent struct {
 	Phase string `json:"phase"` // "download" or "check"
 }
 
-// Download fetches the release ISO (or reuses a verified cached copy).
-func (a *App) Download() (*ISOInfo, error) {
-	a.mu.Lock()
-	rel := a.release
-	a.mu.Unlock()
+// Download fetches the ISO of the given release (or reuses a verified cached
+// copy).
+func (a *App) Download(version string) (*ISOInfo, error) {
+	rel := a.findRelease(version, "")
 	if rel == nil {
-		return nil, errors.New("the latest release is not known yet")
+		return nil, fmt.Errorf("release %s is not known yet", version)
 	}
 	ctx, done, err := a.startJob()
 	if err != nil {
@@ -158,6 +207,16 @@ func (a *App) Download() (*ISOInfo, error) {
 			return nil, errors.New("cancelled")
 		}
 		return nil, err
+	}
+	// Keep only the versions the app offers (1.4 GB each).
+	a.mu.Lock()
+	keep := a.releases
+	a.mu.Unlock()
+	if len(keep) > offered {
+		keep = keep[:offered]
+	}
+	if len(keep) > 0 {
+		stick.PruneCache(append(append([]stick.Release{}, keep...), *rel))
 	}
 	return a.useISO(path, rel.SHA256, rel)
 }
@@ -191,10 +250,7 @@ func (a *App) ChooseISO() (*ISOInfo, error) {
 		}
 		return nil, err
 	}
-	a.mu.Lock()
-	rel := a.release
-	a.mu.Unlock()
-	return a.useISO(path, sum, rel)
+	return a.useISO(path, sum, a.findRelease("", sum))
 }
 
 func (a *App) useISO(path, sum string, rel *stick.Release) (*ISOInfo, error) {
