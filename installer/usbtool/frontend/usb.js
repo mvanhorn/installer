@@ -552,7 +552,7 @@ function mockApi() {
   let cancelled = false;
   return {
     // "#arm" previews the note an ARM computer shows.
-    Info: async () => ({ version: "1.1", os: "windows", guideUrl: "https://project-july.org/setup", arm: location.hash === "#arm" }),
+    Info: async () => ({ version: "1.2", os: "windows", guideUrl: "https://project-july.org/setup", arm: location.hash === "#arm" }),
     Release: async () => { await wait(400); return { version: "v0.8", url: "", sha256: "19378a2b9d75339d82655c8cf032b2d5caead5da71968563a5d94f7a45f824f3", size: 1413529600 }; },
     // "#one" leaves Releases out, to preview the latest.json-only screen.
     Releases: location.hash === "#one" ? undefined : async () => {
