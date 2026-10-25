@@ -142,16 +142,26 @@ func Execute(plan RestorePlan, opt RestoreOptions) error {
 			"Could not open the oven storage for writing",
 			fmt.Sprintf("%s: %v", plan.Device, err))
 	}
-	defer dst.Close()
-
-	buf := make([]byte, 4<<20)
-	if _, err := io.CopyBuffer(dst, src, buf); err != nil {
+	writeFailed := func(err error) error {
 		return stop("write",
 			"Writing the oven storage failed",
 			fmt.Sprintf("%v\nKeep the oven powered and connected. Do not unplug it. Retry the restore.", err))
 	}
+
+	buf := make([]byte, 4<<20)
+	if _, err := io.CopyBuffer(dst, src, buf); err != nil {
+		dst.Close()
+		return writeFailed(err)
+	}
+	// A failed flush or close means the eMMC may not hold the image.
 	if sc, ok := dst.(interface{ Sync() error }); ok {
-		_ = sc.Sync()
+		if err := sc.Sync(); err != nil {
+			dst.Close()
+			return writeFailed(err)
+		}
+	}
+	if err := dst.Close(); err != nil {
+		return writeFailed(err)
 	}
 	return nil
 }

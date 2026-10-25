@@ -181,8 +181,8 @@ Assets: `website-assets/png/15-backup-destination.png`,
 Restoring replaces everything on the oven with the backup image. The installer
 checks the image size and SHA256 *before* it writes, and refuses if the file
 is the wrong size, the `.sha256` sidecar is missing, or the digest does not
-match. Type **RESTORE** is still required; a dry-run of the same checks runs
-first so a damaged backup never reaches the oven.
+match, so a damaged backup never reaches the oven. Typing **RESTORE** is
+still required.
 
 1. Choose **Restore a backup**.
 2. Pick the drive that holds the backup image, press **Find backups**, and
@@ -259,7 +259,7 @@ start** button. The details panel and the USB log show the last steps.
 | “Waiting for the oven” never changes | USB cable seated in the laptop (not a hub), SW2 held while powering on, oven power on. Try **Start without detecting** only if you know the oven is in RCM. |
 | No usable backup drive | Drive is exFAT/NTFS/ext4 and writable; at least 8 GB free; rescan. |
 | Wrong size on a restore image | The image is not a complete 7.8 GB oven backup. |
-| “This backup has no SHA256 file” | The `.sha256` sidecar is missing. Make a new backup, or run `backup.sh checksum` on the `.img` only if you trust that copy. |
+| “This backup has no SHA256 file” | The `.sha256` sidecar is missing. Make a new backup. On a Linux laptop, `june-backup checksum -image FILE` writes one, but only do that if you trust that copy. |
 | “The backup file does not match its SHA256” | The image is damaged or incomplete. Do not restore it. |
 | Secure Boot verification error | Ventoy sticks only: enroll Ventoy’s key or disable Secure Boot. June USB sticks start with Secure Boot on. |
 | Graphical installer falls back to text | On builds before 2026-10-05 the kiosk log showed `Cannot find Xwayland binary "/usr/bin/Xwayland"`; the current image includes Xwayland and retries the software renderer. Update the USB image, or use the text UI on the older stick. |

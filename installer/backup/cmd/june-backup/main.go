@@ -203,8 +203,9 @@ func printStop(err error) {
 	if s, ok := err.(backup.Stop); ok {
 		fmt.Fprintf(os.Stderr, "[-] %s\n", s.Title)
 		if s.Detail != "" {
+			// "[-] " on every line: the installer GUI only shows those lines.
 			for _, line := range strings.Split(s.Detail, "\n") {
-				fmt.Fprintf(os.Stderr, "    %s\n", line)
+				fmt.Fprintf(os.Stderr, "[-] %s\n", line)
 			}
 		}
 		return

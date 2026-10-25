@@ -182,3 +182,28 @@ func TestLatestVerifiedNoneGood(t *testing.T) {
 		t.Fatalf("want checksum stop, got %v", err)
 	}
 }
+
+type failCloseDevice struct {
+	bufDevice
+}
+
+func (f *failCloseDevice) Close() error { return io.ErrShortWrite }
+
+func TestExecuteReportsCloseError(t *testing.T) {
+	body := "june-emmc-bytes"
+	img, opt := fixture(t, body)
+	opt.Write = true
+	opt.Confirm = RestoreConfirm
+	opt.Device = "/dev/june"
+	opt.DeviceSize = func(string) (int64, error) { return int64(len(body)), nil }
+	opt.OpenDevice = func(string) (io.WriteCloser, error) { return &failCloseDevice{}, nil }
+
+	plan, err := PlanRestore(img, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Execute(plan, opt)
+	if s, ok := err.(Stop); !ok || s.Code != "write" {
+		t.Fatalf("want write stop on a failed close, got %v", err)
+	}
+}

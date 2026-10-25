@@ -1234,7 +1234,6 @@ if [ "$MODE" = "checksum" ]; then
 fi
 
 if [ "$MODE" = "restore-dry" ]; then
-  echo "[*] Dry-run restore (nothing will be written)"
   image="${2:-}"
   if [ -x "$DIR/june-backup" ]; then
     if [ -n "${3:-}" ]; then
@@ -1243,6 +1242,7 @@ if [ "$MODE" = "restore-dry" ]; then
       "$DIR/june-backup" restore -image "$image" -dry-run || exit 1
     fi
   else
+    echo "[*] Dry-run restore (nothing will be written)"
     verify_backup_image "$image" || exit 1
     echo "[+] Image is usable. Nothing was written."
   fi
@@ -1329,12 +1329,10 @@ case "$MODE" in
         exit 1
       fi
     fi
+    # find_june_disk already matched the oven by size and skipped the boot
+    # disk, so only the image needs checking here.
     echo "[*] Verifying backup image before writing..."
-    if [ -x "$DIR/june-backup" ]; then
-      "$DIR/june-backup" restore -image "$image" -device "$JUNE_DISK" -dry-run || exit 1
-    else
-      verify_backup_image "$image" || exit 1
-    fi
+    verify_backup_image "$image" || exit 1
     echo "[*] WARNING: this overwrites the oven eMMC with $image"
     read -rp "Type RESTORE to continue: " confirm
     [ "$confirm" = "RESTORE" ] || { echo "[-] Aborted."; exit 1; }
@@ -1357,7 +1355,7 @@ chmod +x "$DEST/install.sh" "$DEST/tegrarcm" "$DEST/backup.sh"
 BACKUP_SRC="$ARCH/installer/backup"
 if [ -d "$BACKUP_SRC/cmd/june-backup" ] && command -v go >/dev/null 2>&1; then
   echo "[*] building june-backup"
-  (cd "$BACKUP_SRC" && CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$SCRIPT_DIR/$DEST/june-backup" ./cmd/june-backup)
+  (cd "$BACKUP_SRC" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -o "$SCRIPT_DIR/$DEST/june-backup" ./cmd/june-backup)
   chmod +x "$DEST/june-backup"
 fi
 
