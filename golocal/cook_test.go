@@ -85,7 +85,7 @@ func TestCookViewHTTP(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &view); err != nil {
 		t.Fatal(err)
 	}
-	if !view.Success || view.State != "cooking" || view.CurrentC != 175.5 || view.TargetC != 177 || view.RemainingSeconds != 540 {
+	if !view.Success || view.State != "active" || view.CurrentC != 175.5 || view.TargetC != 177 || view.RemainingSeconds != 540 {
 		t.Fatalf("cook json = %+v", view)
 	}
 	if !view.OvenConnected {
@@ -139,6 +139,45 @@ func TestCookingStateFrame(t *testing.T) {
 	c := parseCook(hub.statusSnapshot())
 	if c.RemainingSeconds != 120 || c.CurrentC != 90 {
 		t.Fatalf("cooking state not applied: %+v", c)
+	}
+}
+
+// The oven's real 10013 frame nests telemetry under sensor_data and
+// cook_state_data.
+func TestCookingStateFrameNested(t *testing.T) {
+	hub := newHub(true, "")
+	hub.setDeviceState(json.RawMessage(`{"state":"active"}`))
+	hub.setCookPlan(json.RawMessage(`{"food":{"name":"bake","plan":{"steps":[{"cook_mode":"bake_standard","temperature_cavity":176667,"exit_criteria":[{"type":"duration","target":{"value":900000}}]}]}}}`))
+	hub.setCookingState(json.RawMessage(`{"sensor_data":{"cavity":150000,"probe":[{"id":"left","value":60000}]},"cook_state_data":{"cook_time_elapsed":891000,"cook_time_remaining":9000}}`))
+	c := parseCook(hub.statusSnapshot())
+	if c.CurrentC != 150 || c.ProbeC != 60 {
+		t.Fatalf("temps current=%v probe=%v", c.CurrentC, c.ProbeC)
+	}
+	if c.RemainingSeconds != 9 {
+		t.Fatalf("remaining = %d, want 9", c.RemainingSeconds)
+	}
+	if c.EtaSeconds != 900 {
+		t.Fatalf("eta = %d", c.EtaSeconds)
+	}
+}
+
+// The plan's total duration is not a countdown.
+func TestCookRemainingNotFromPlan(t *testing.T) {
+	c := parseCook(StatusSnapshot{
+		DeviceState: json.RawMessage(`{"state":"active"}`),
+		CookPlan:    json.RawMessage(`{"food":{"plan":{"steps":[{"exit_criteria":[{"type":"duration","target":{"value":900000}}]}]}}}`),
+	})
+	if c.RemainingSeconds != 0 || c.EtaSeconds != 900 {
+		t.Fatalf("remaining=%d eta=%d", c.RemainingSeconds, c.EtaSeconds)
+	}
+}
+
+func TestCookingStateClearedOnEnd(t *testing.T) {
+	hub := newHub(true, "")
+	hub.setCookingState(json.RawMessage(`{"sensor_data":{"cavity":150000}}`))
+	hub.setCookingState(nil)
+	if c := parseCook(hub.statusSnapshot()); c.CurrentC != 0 {
+		t.Fatalf("stale cooking state: %+v", c)
 	}
 }
 

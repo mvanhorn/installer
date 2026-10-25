@@ -47,7 +47,7 @@ Common flags:
   frame; normally the oven identifies itself.
 - `--mjpeg-fps` and `--mjpeg-viewer-gate` — MJPEG stream cadence and the
   viewer-driven camera gate (default on).
-- `--fixture FILE` — load `device_state` / `cook_plan` from JSON so `/local/cook`
+- `--fixture FILE` — load `device_state` / `cooking_state` / `cook_plan` from JSON so `/local/cook`
   can be tried without an oven (Home Assistant REST sensors, UI work).
 
 `june-camerad` defaults to `--source auto`, which prefers the stock

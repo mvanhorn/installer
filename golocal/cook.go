@@ -95,8 +95,30 @@ func applyDeviceCook(c *CookStatus, ds map[string]any) {
 	if v, ok := numberField(ds, "cook_time_remaining", "remaining_time", "time_remaining", "remaining_cook_time"); ok {
 		c.RemainingSeconds = milliToSeconds(v)
 	}
+	// 10013 CookingState nests telemetry: sensor_data.cavity / probe[] in
+	// milli-degrees C and cook_state_data.cook_time_remaining in ms.
+	if sd, ok := ds["sensor_data"].(map[string]any); ok {
+		if v, ok := numberField(sd, "cavity"); ok {
+			c.CurrentC = milliToC(v)
+		}
+		if probes, ok := sd["probe"].([]any); ok {
+			for _, p := range probes {
+				if pm, ok := p.(map[string]any); ok {
+					if v, ok := numberField(pm, "value"); ok && v > 0 {
+						c.ProbeC = milliToC(v)
+						break
+					}
+				}
+			}
+		}
+	}
+	if csd, ok := ds["cook_state_data"].(map[string]any); ok {
+		if v, ok := numberField(csd, "cook_time_remaining"); ok {
+			c.RemainingSeconds = milliToSeconds(v)
+		}
+	}
 	if timer, ok := ds["timer"].(map[string]any); ok {
-		if v, ok := numberField(timer, "remaining", "remaining_ms", "seconds"); ok {
+		if v, ok := numberField(timer, "remaining", "remaining_ms"); ok {
 			c.RemainingSeconds = milliToSeconds(v)
 		}
 	} else if v, ok := numberField(ds, "timer"); ok {
@@ -159,9 +181,6 @@ func applyCookPlan(c *CookStatus, raw json.RawMessage) {
 		}
 	}
 	c.EtaSeconds = eta
-	if c.RemainingSeconds == 0 && eta > 0 && c.State != "idle" {
-		c.RemainingSeconds = eta
-	}
 }
 
 func mapFromRaw(raw json.RawMessage) map[string]any {
@@ -236,11 +255,9 @@ func milliToC(v float64) float64 {
 	return v
 }
 
+// milliToSeconds converts June's millisecond durations to whole seconds.
 func milliToSeconds(v float64) int64 {
-	if v > 10000 || v < -10000 {
-		return int64(v / 1000)
-	}
-	return int64(v)
+	return int64(v / 1000)
 }
 
 func loadStatusFixture(hub *Hub, path string) error {

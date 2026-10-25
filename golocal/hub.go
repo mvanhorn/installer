@@ -217,6 +217,8 @@ func (h *Hub) detach(p *Peer) {
 	if h.oven == p {
 		h.oven = nil
 		h.lastStatus.ConnectionState = "disconnected"
+		h.lastStatus.CookingState = nil
+		h.lastCookingState = nil
 		// A dropped oven socket can lose the 10018 idle / 10017 end frames.
 		// Fail safe: do not let the camera bridge stay off (or a future
 		// writer think a cook is still active) after the oven goes away.
