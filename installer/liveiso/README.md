@@ -94,18 +94,33 @@ the phone view.
   staged in `/system` so it survives a factory reset.
 - Both install flows ask for an oven name: the standard flow defaults to
   `june`, the custom flow to `june.local` (its IP field is prefilled with
-  `192.168.1.`). The name is written to `/system/etc/june_hostname` and the
-  boot script sets `net.hostname` from it, so Android advertises
-  `<name>.local` over mDNS. Factory-reset persistence is a yes/no question and
-  defaults to No.
-- In the standard (prepackaged) install the name is mDNS-only: June's
-  prepackaged certificate does not cover it, so HTTPS-by-name needs the custom
-  (per-home CA) install, which puts the name in the certificate SAN.
-- Optional for other devices on the network: point `api.junelife.com` and
+  `192.168.1.`). The name is written to `/system/etc/june_hostname`; the boot
+  script sets `net.hostname` from it, and `june_bootclear.sh` also sets the
+  kernel host name before starting the June Local DNS helper
+  (`com.july.dns/.MdnsService`, staged as the system app
+  `/system/app/JuneDns/JuneDns.apk`). The helper registers a `June Local`
+  `_http._tcp` service, which starts Android's mdnsd, so the oven resolves as
+  `<name>.local`: `june.local`/`june2.local`/`june3.local` for the standard
+  names (the standard certificate covers those), or the custom host name (the
+  per-home certificate carries it as a SAN). mDNS needs multicast on the same
+  VLAN; if `.local` does not resolve (guest network, VLAN isolation, IGMP
+  snooping), use the oven IP instead. Test steps are in
+  [`TEST_RUNBOOK.md`](TEST_RUNBOOK.md) ("mDNS / .local check"). Factory-reset
+  persistence is a yes/no question and defaults to No.
+- The standard (prepackaged) certificate covers `june.local`, `june2.local`
+  and `june3.local` (use `june2`/`june3` for additional ovens) but not a raw IP.
+  The custom install's certificate includes the oven IP, so "Connect by IP" is
+  the no-hostname/DNS path.
+- Optional/advanced for the stock June app: point `api.junelife.com` and
   `messaging.junelife.com` at the oven's IP in local DNS (or a hosts file). The
-  prepackaged certificate is a real certificate for those names, so even stock
-  June clients verify there. The installer already writes the equivalent
-  entries into the oven's own `/etc/hosts`.
+  project certificate covers those names; the installer already writes the
+  equivalent entries into the oven's own `/etc/hosts`. The companion app can
+  use `june.local` or the IP instead.
+- The basic install adds the project certificate authority to the oven's trust
+  store (`/system/etc/security/cacerts/bbb69c96.0`) and serves the CA alone at
+  `/local/ca.crt`; the phone must install that CA before it will trust the
+  oven. The custom install uses a per-home CA instead and keeps working the
+  same way.
 - USB/oven connection guide: <https://project-july.org/setup>.
 - `/opt/june-installer` on the live system contains `install.sh` and the deploy
   assets.

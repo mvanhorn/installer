@@ -35,6 +35,47 @@ If the menu does not auto-open, run:
 june-menu
 ```
 
+## mDNS / .local check (June Local DNS helper)
+
+The oven advertises a `June Local` DNS-SD service (`_http._tcp`, port 80) and
+resolves as `<name>.local`, where `<name>` is `/system/etc/june_hostname`
+(basic installs: `june`, `june2`, `june3`; custom installs: whatever name was
+chosen, and the per-home certificate carries it as a SAN). This needs the tiny
+`com.july.dns` helper APK: the installer stages it as the system app
+`/system/app/JuneDns/JuneDns.apk`, and `/system/bin/june_bootclear.sh` starts
+`com.july.dns/.MdnsService` after `boot_completed`.
+
+Check on the oven (from the live system or over ADB):
+
+```bash
+adb shell getprop net.hostname     # should match /system/etc/june_hostname
+adb shell cat /proc/sys/kernel/hostname   # kernel host name (mdnsd uses it)
+adb shell pm path com.july.dns
+adb shell dumpsys activity services com.july.dns
+adb logcat -d -s JuneLocalDns      # expect "mDNS service registered"
+adb shell am startservice --user 0 -n com.july.dns/.MdnsService   # manual kick
+```
+
+From a Mac/iPhone on the same VLAN:
+
+```bash
+dns-sd -B _http._tcp                     # "June Local" must appear
+dns-sd -L "June Local" _http._tcp        # SRV target <name>.local, port 80
+ping -c 3 june.local                     # basic install default
+curl -s http://june.local/local/status   # June Local answers
+open http://june.local/local             # status page
+```
+
+Expected: the service is discovered and `http://<name>.local/local` shows the
+June Local status page. If the name resolves to `android.local` or not at all,
+check `net.hostname`/`hostname`, the `JuneLocalDns` log lines, and that the
+client is on the same VLAN. mDNS needs multicast on the LAN: guest networks,
+VLAN isolation, IGMP snooping and some Wi-Fi clients break it. Fallback:
+`http://<oven-ip>/local` (the custom certificate always carries the oven IP as
+a SAN; the basic install's status page works by IP too). Multiple ovens need
+distinct names; a duplicate name makes mdnsd rename the service
+(`June Local (2)`).
+
 ## GUI dependency preflight (build-enforced)
 
 The graphical installer uses `cage` (Wayland kiosk), `cog` (WPE WebKit), and
@@ -223,8 +264,14 @@ data partition after reboot.
   not auto-detected.
 - Plain HTTP listener is now on port `80` in the current oven service.
   Moving user-facing HTTP to port `80` is planned but not yet implemented.
-- mDNS is not implemented. Multiple ovens will need service discovery, not a
-  single fixed `.local` name.
+- mDNS host names are implemented by the separate June Local DNS helper
+  (`com.july.dns/.MdnsService`, staged as `/system/app/JuneDns/JuneDns.apk` and
+  started by `/system/bin/june_bootclear.sh` after `boot_completed`). It
+  registers a `June Local` `_http._tcp` service, which starts Android's mdnsd;
+  the advertised name comes from `/system/etc/june_hostname` (basic:
+  `june`/`june2`/`june3`; custom: the chosen name). See "mDNS / .local check".
+  Multiple ovens still need distinct names, and networks without multicast
+  (guest VLANs, IGMP snooping) need the IP path instead.
 - Home Assistant integration should default to plain HTTP by IP, with CA paste
   and TLS verification as opt-in/advanced only.
 - Do not distribute or bundle a CA private key in the integration or installer.
@@ -236,5 +283,7 @@ data partition after reboot.
 - `installer/liveiso/build_live_iso.sh`
 - `installer/liveiso/prepare_assets.sh`
 - `installer/liveiso/README.md`
+- `installer/onoven/june-dns/` (new `com.july.dns` mDNS helper app)
+- `installer/onoven/june_bootclear.sh.onoven` (starts the mDNS helper)
 
 These changes are not necessarily committed yet.

@@ -28,7 +28,12 @@ type Config struct {
 	OvenPath        string
 	OvenPubkey      string
 	OvenID          string
-	Identity        string
+	Identity        string // companion identity.json from june_capture.py (--identity)
+	IdentityFile    string // local oven identity record, minted/loaded here (--identity-file)
+	SeedTokenFile   string // installer-seeded v2 token, survives a factory reset (--seed-token)
+	AccountsDB      string // Android account database, probed read-only (--accounts-db)
+	MintIdentity    bool   // create identity.json with a fresh token when absent (--mint-identity)
+	SeedAccounts    bool   // refused at runtime; the pre-Android boot ensure owns accounts.db
 	LogPath         string
 	JsonlPath       string
 	Tag             string
@@ -113,16 +118,25 @@ func main() {
 	initInteriorLight()
 
 	if cfg.Identity != "" {
+		// --identity is the *companion* identity from june_capture.py (it holds
+		// the oven's public signing key). The oven's own identity record is
+		// --identity-file; the two are deliberately separate documents.
 		if b, err := os.ReadFile(cfg.Identity); err == nil {
 			var idt map[string]any
 			if jsonUnmarshal(b, &idt) == nil {
 				if cfg.OvenPubkey == "" {
 					cfg.OvenPubkey, _ = idt["oven_public_signing_key"].(string)
 				}
-				logLine("[init] loaded identity %s", cfg.Identity)
+				logLine("[init] loaded companion identity %s", cfg.Identity)
 			}
 		}
 	}
+
+	// Load (or mint) the local oven identity and log one redacted summary. The
+	// Android account row itself can only be created before Android starts, so
+	// this only observes it; the status page turns a missing row into a red
+	// "identity-missing" problem.
+	initOvenIdentity(cfg)
 
 	if _, err := os.Stat(cfg.Cert); err != nil {
 		log.Fatalf("missing cert: %s", cfg.Cert)
@@ -223,7 +237,13 @@ func parseFlags() *Config {
 	flag.StringVar(&cfg.OvenPath, "oven-path", "", "pin the oven WebSocket path")
 	flag.StringVar(&cfg.OvenPubkey, "oven-pubkey", "", "base64 oven public signing key")
 	flag.StringVar(&cfg.OvenID, "oven-id", "", "optional oven device id to use before the oven connects")
-	flag.StringVar(&cfg.Identity, "identity", "", "identity.json from june_capture.py")
+	flag.StringVar(&cfg.Identity, "identity", "", "companion identity.json from june_capture.py (not the oven identity; see --identity-file)")
+	flag.StringVar(&cfg.Identity, "companion-identity", "", "alias for --identity (companion identity.json)")
+	flag.StringVar(&cfg.IdentityFile, "identity-file", defaultIdentityFile, "local oven identity record; created when absent by --mint-identity")
+	flag.StringVar(&cfg.SeedTokenFile, "seed-token", defaultSeedTokenFile, "installer-seeded v2 token copied into identity.json when it is absent")
+	flag.StringVar(&cfg.AccountsDB, "accounts-db", defaultAccountsDB, "Android accounts.db probed read-only for the June account row")
+	flag.BoolVar(&cfg.MintIdentity, "mint-identity", true, "create identity.json with a fresh v2 token when none exists")
+	flag.BoolVar(&cfg.SeedAccounts, "seed-accounts", false, "refused at runtime: june-local never writes accounts.db (the pre-Android boot ensure does)")
 	flag.StringVar(&cfg.LogPath, "log", "local_cloud.log", "log file")
 	flag.StringVar(&cfg.JsonlPath, "jsonl", "capture/local_cloud_frames.jsonl", "JSONL capture file")
 	flag.StringVar(&cfg.Tag, "tag", "", "provenance tag stamped into every JSONL record")

@@ -390,8 +390,8 @@ def make_installer_ui():
     out.append(text(100, 300, "What would you like to do?", size=48, weight="300", fill=FG))
 
     tiles = [
-        ("Install June Local", "Keeps June's certificate and the factory app. The quickest way.", "RECOMMENDED", EMBER),
-        ("Install with your own CA", "Advanced. Creates a certificate authority just for your home.", None, EMBER2),
+        ("Install June Local", "Recommended. Adds the project CA to the oven; install it on the phone too.", "RECOMMENDED", EMBER),
+        ("Install with your own CA", "Alternative. Creates a per-home certificate authority and CA file.", None, EMBER2),
         ("Back up the oven", "A full copy of the oven's storage on a USB drive. 15 to 30 minutes.", None, BLUE),
         ("Restore a backup", "Puts a backup image back on the oven.", None, GREEN),
     ]
@@ -444,7 +444,7 @@ def make_install_options():
     out = [title_header("Install June Local · options", "The recommended, simplest install", mockup=True)]
     out.append(wizard_steps(0))
     out.append(text(130, 300, "Install June Local on this oven", size=38, weight="300", fill=FG))
-    out.append(paragraph(130, 350, "The oven keeps June's certificate and its factory messaging app, so the June app works as before, but talks to June Local instead of June's cloud.", width=78, size=22, lh=31))
+    out.append(paragraph(130, 350, "Adds the project CA to the oven's trust store, so the factory June apps accept June Local. The June app works as before, but talks to June Local instead of June's cloud. Install this CA on the phone afterwards.", width=78, size=22, lh=31))
     out.append(rect(130, 440, 1340, 120, fill=PANEL, rx=14))
     out.append(rect(160, 475, 34, 34, fill=BG2, stroke=LINE, rx=6))
     out.append(text(220, 500, "Keep the no-pin patch after a factory reset", size=24, fill=FG))
@@ -454,8 +454,8 @@ def make_install_options():
     out.append(text(295, 660, "Next: connect the oven", size=22, weight="700", fill="#160a04", anchor="middle"))
     out.append(rect(490, 620, 170, 62, fill=BG2, rx=12))
     out.append(text(575, 660, "Back", size=22, fill=MUTED, anchor="middle"))
-    out.append(card(130, 720, 1340, 100, "What this does", "Installs the local server, the camera bridge, and the project certificate. The factory June app keeps working, but locally.", accent=GREEN, title_size=22, pad=20))
-    out.append(footer("Choose “Install with your own CA” only if you specifically want a per-home certificate authority."))
+    out.append(card(130, 720, 1340, 100, "What this does", "Adds the project CA to the oven's trust store, plus the local server and camera bridge. Install the same CA on your phone.", accent=GREEN, title_size=22, pad=20))
+    out.append(footer("Default install is the everyday path; custom is for a per-home CA."))
     return svg_doc("".join(out))
 
 
@@ -527,7 +527,7 @@ def make_success():
         "Unplug the oven's power and the USB cable.",
         "Wait 10 seconds, plug the power back in and let the oven start normally.",
         "From a device on the same network, open http://<oven-ip>/local. You should see the June Local status page.",
-        "Pair from the June app or Home Assistant. Then close up the oven.",
+        "On the phone, install the CA from http://<oven-ip>/local/ca.crt, then pair from the June app or Home Assistant.",
     ]
     y = 430
     for i, s in enumerate(steps):
@@ -536,7 +536,7 @@ def make_success():
         y += 75
     out.append(rect(130, 780, 260, 58, fill=EMBER, rx=12))
     out.append(text(260, 818, "Done", size=22, weight="700", fill="#160a04", anchor="middle"))
-    out.append(footer("If you chose a custom CA, download the CA and companion app from the phone QR code before closing up."))
+    out.append(footer("A basic install installs the project CA; custom uses the per-home CA on the USB."))
     return svg_doc("".join(out))
 
 
@@ -597,7 +597,7 @@ def make_phone_access():
     out.append(rect(130, 500, 640, 300, fill=PANEL, rx=16))
     out.append(qr_mock(180, 545, 200))
     out.append(text(420, 610, "Scan with your phone's camera", size=22, fill=MUTED))
-    out.append(text(420, 655, "http://192.168.1.50/", size=22, fill=EMBER2, font=MONO))
+    out.append(text(420, 655, "http://192.168.1.100/", size=22, fill=EMBER2, font=MONO))
     out.append(rect(810, 500, 660, 300, fill=PANEL, rx=16))
     out.append(text(850, 555, "Allow a phone on this network", size=25, weight="700", fill=FG))
     out.append(paragraph(850, 595, "Anyone who scans the code can control the installer. Turning it off disconnects phones and makes a new code.", width=60, size=20, lh=28))
@@ -632,8 +632,8 @@ def make_text_mode():
 
 def make_basic_vs_custom():
     out = [title_header("Basic vs custom install", "Pick the recommended path unless you need a per-home CA")]
-    out.append(card(90, 200, 680, 420, "Install June Local", "Keeps June's certificate and the factory app. The quickest way. The June app and Home Assistant pair normally; no CA install on the phone.", accent=EMBER, title_size=30, pad=26))
-    out.append(card(830, 200, 680, 420, "Install with your own CA", "Advanced. Creates a private certificate authority on the USB, signs a certificate for the oven's address, and gives you a CA file to install on the phone. Use it if you want a per-home CA.", accent=EMBER2, title_size=30, pad=26))
+    out.append(card(90, 200, 680, 420, "Install June Local", "Recommended. Adds the project CA to the oven's trust store and keeps the factory app. Install the same CA on the phone; then the June app and Home Assistant pair normally.", accent=EMBER, title_size=30, pad=26))
+    out.append(card(830, 200, 680, 420, "Install with your own CA", "Alternative. Creates a private certificate authority on the USB, signs a certificate for the oven's address, and gives you a CA file to install on the phone. Use it if you want a per-home CA.", accent=EMBER2, title_size=30, pad=26))
     out.append(rect(90, 660, 1420, 120, fill=PANEL, rx=16))
     out.append(text(130, 710, "Persistence option", size=26, weight="700", fill=FG))
     out.append(text(130, 750, "Off by default. Turn it on only if you want the no-pin patch to survive a factory reset; it stores the patched app in /system.", size=20, fill=MUTED))

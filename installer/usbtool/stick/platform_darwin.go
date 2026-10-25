@@ -17,6 +17,14 @@ import (
 // disk needs root; the app re-runs itself for that step through osascript,
 // which shows the standard macOS password prompt.
 
+func init() {
+	// fsync(2) does not work on raw disks on macOS: /dev/rdisk* returns
+	// ENOTTY.  The boot-code helper uses sync(2) instead (syncBootDevice).
+	// sync(2) cannot fail in a way that matters here: the writes are already
+	// on the stick and read back, so a failure is ignored.
+	syncAll = func() { _ = syscall.Sync() }
+}
+
 func diskutil(ctx context.Context, args ...string) ([]byte, error) {
 	out, err := exec.CommandContext(ctx, "/usr/sbin/diskutil", args...).CombinedOutput()
 	if err != nil {

@@ -134,6 +134,7 @@ jobs:
   macos:
     needs: test
     runs-on: macos-latest
+    timeout-minutes: 240
     env:
       CAN_SIGN: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
       HAS_CERT: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
@@ -186,7 +187,22 @@ jobs:
         run: |
           codesign --force --timestamp --sign "$IDENTITY" build/bin/June-USB.dmg
           echo "$KEY" | base64 --decode > "$RUNNER_TEMP/key.p8"
-          xcrun notarytool submit build/bin/June-USB.dmg --key "$RUNNER_TEMP/key.p8" --key-id "$KEY_ID" --issuer "$ISSUER" --wait
+          auth=(--key "$RUNNER_TEMP/key.p8" --key-id "$KEY_ID" --issuer "$ISSUER")
+          # Poll instead of --wait: Apple can take an hour or more, and one
+          # dropped connection during --wait failed the 15 Oct run.
+          id="$(xcrun notarytool submit build/bin/June-USB.dmg "${auth[@]}" --output-format json | jq -r .id)"
+          [ -n "$id" ] && [ "$id" != null ] || { echo "notarytool submit failed" >&2; exit 1; }
+          echo "Submission $id (xcrun notarytool info $id ... to check it by hand)"
+          for i in $(seq 1 360); do
+            status="$(xcrun notarytool info "$id" "${auth[@]}" --output-format json 2>/dev/null | jq -r .status 2>/dev/null || echo unknown)"
+            echo "$(date -u +%H:%M:%S) $status"
+            case "$status" in
+              Accepted) break ;;
+              Invalid|Rejected) xcrun notarytool log "$id" "${auth[@]}"; exit 1 ;;
+            esac
+            sleep 30
+          done
+          [ "$status" = Accepted ] || { echo "Notarization not finished after 3 hours: $id" >&2; exit 1; }
           xcrun stapler staple build/bin/June-USB.dmg
           spctl --assess --type open --context context:primary-signature -v build/bin/June-USB.dmg
       - uses: actions/upload-artifact@v7

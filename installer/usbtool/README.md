@@ -63,6 +63,33 @@ go test ./stick
 Releases come from `.github/workflows/june-usb.yml` (tag `usb-vX.Y`); see
 [SIGNING.md](SIGNING.md).
 
+## macOS: "Writing the boot code" error after the copy (fixed)
+
+macOS builds before this fix could stop at the last step, after all 842 files
+had been copied and verified, with:
+
+```text
+Writing the boot code: 0:347: execution error: sync /dev/rdisk4: inappropriate ioctl for device (1)
+```
+
+`fsync(2)` is not implemented for raw disks on macOS: `/dev/rdisk*` returns
+`ENOTTY` even though the write already reached the stick. The app treated that
+as a failure, so it reported the run as failed and skipped the eject. No data
+was damaged and nothing needs to be re-copied.
+
+The copied installer files are complete and verified by SHA256 before the boot
+code is touched. The boot code only adds legacy-BIOS support: a stick from a
+failing run still starts on UEFI computers (every Mac and any PC from the last
+decade). Only old BIOS-only PCs need the boot code.
+
+Current builds fix this: the boot code is still read back and verified, an
+unsupported `fsync` is no longer an error, and the stick is flushed with
+`sync(2)` and ejected instead. If you hit this on an older build, update the
+app and run it again (Update mode keeps the `JUNE` partition), or use a
+known-good Ventoy stick on BIOS-only machines (Ventoy boots both UEFI and
+legacy BIOS). Eject the stick from Finder before unplugging it after a failing
+run, since the automatic eject was skipped.
+
 ## Test without a real stick (Linux/WSL, as root)
 
 ```sh
@@ -80,8 +107,8 @@ On Windows, `JUNE_USB_ALLOW_VHD=1` lists attached VHDs.
 The app reads `https://downloads.project-july.org/installer/latest.json`:
 
 ```json
-{"version": "v0.7", "url": "https://downloads.project-july.org/installer/v0.7/june-local-live.iso",
- "sha256": "ac0a86673b7cc7c15d73f7109066baf1a43f7f1f1767555b20d2dacef59438c5", "size": 1413529600}
+{"version": "v0.8", "url": "https://downloads.project-july.org/installer/v0.8/june-local-live.iso",
+ "sha256": "<the published sha256>", "size": <bytes>}
 ```
 
 It also reads `https://downloads.project-july.org/installer/releases.json`

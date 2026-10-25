@@ -462,6 +462,10 @@ class App:
 
     def files(self) -> dict:
         ca = self.payload / "certs" / "ca.crt"
+        if not ca.is_file():
+            # Basic installs do not generate a per-home CA; the payload carries
+            # the project CA at this path.  The phone needs it too.
+            ca = self.payload / "junelife_ca.crt"
         apk = self.payload / "companion_endpoint_signed.apk"
         return {"ca.crt": ca.is_file() or self.mock, "companion.apk": apk.is_file() or self.mock}
 
@@ -509,7 +513,7 @@ class App:
             try:
                 ipaddress.IPv4Address(ip)
             except ValueError:
-                raise ApiError(400, "Enter the oven's LAN IPv4 address, for example 192.168.1.50.")
+                raise ApiError(400, "Enter the oven's LAN IPv4 address, for example 192.168.1.100.")
             if not HOST_RE.match(host):
                 raise ApiError(400, "The hostname may only contain letters, digits, dots and dashes.")
             params.update(ip=ip, host=host)

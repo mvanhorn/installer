@@ -16,6 +16,13 @@
 # Android starts, instead of relying on a second EncFS mount of the same
 # volume later in boot, which cannot work while /system (holding the
 # ciphertext) is read-only.
+#
+# June Local also installs the pre-seeded June account row here, before Android
+# starts: a factory reset wipes /data/system/users/0/accounts.db, and without
+# that AccountManager row the June apps never attach a bearer token to the
+# messaging socket (the oven looks "disconnected" even though the install is
+# fine).  The seed and token come from /system/etc/june/identity and the step is
+# idempotent and best-effort.
 
 LOG_TAG="junebucket"
 LOG_NAME="${0}:"
@@ -29,6 +36,111 @@ loge ()
 logi ()
 {
   /system/bin/log -t $LOG_TAG -p i "$LOG_NAME $@"
+}
+
+# --- June Local: per-oven June account/identity ----------------------------
+# The June apps read one Android AccountManager row from
+# /data/system/users/0/accounts.db (type com.junelife.user, authtoken type
+# "Full access").  A factory reset wipes it, which drops the JCM's bearer token
+# and leaves the oven "disconnected" even when the install is correct.  The
+# installer ships a per-oven seed DB and token in /system; the ensure below
+# runs BEFORE Android starts and installs the seed when the row is missing.
+# It is idempotent and must never fail the boot: every error path only logs.
+ID_DIR="/system/etc/june/identity"
+ID_SEED="$ID_DIR/accounts_seed.db"
+ID_TOKEN_FILE="$ID_DIR/token"
+ID_JSON_SEED="$ID_DIR/identity.json"
+ID_ACCOUNTS_DB="/data/system/users/0/accounts.db"
+ID_LOG="/data/june/logs/identity.log"
+ID_MARKER="/data/june/identity_ensure.state"
+
+identity_log ()
+{
+   /system/bin/busybox mkdir -p /data/june/logs 2>/dev/null
+   ID_STAMP=`/system/bin/busybox date 2>/dev/null`
+   echo "${ID_STAMP:-unknown} $*" >> "$ID_LOG" 2>/dev/null
+   /system/bin/busybox chmod 0644 "$ID_LOG" 2>/dev/null
+   logi "june-local identity: $*"
+}
+
+identity_marker ()
+{
+   /system/bin/busybox mkdir -p /data/june 2>/dev/null
+   echo "$1" > "$ID_MARKER" 2>/dev/null
+   /system/bin/busybox chmod 0644 "$ID_MARKER" 2>/dev/null
+}
+
+identity_ensure_record ()
+{
+   # /data/june/identity.json is bookkeeping for june-local/the status page, not
+   # the gate; restore it from the /system copy after a reset removed it.  0600:
+   # it contains the full v2: token, which only root programs read.
+   [ -f "$ID_JSON_SEED" ] || return 0
+   [ -f /data/june/identity.json ] && return 0
+   /system/bin/busybox mkdir -p /data/june 2>/dev/null
+   if cp -f "$ID_JSON_SEED" /data/june/identity.json 2>/dev/null; then
+      /system/bin/busybox chmod 0600 /data/june/identity.json 2>/dev/null
+      identity_log "restored /data/june/identity.json from /system"
+   fi
+   return 0
+}
+
+identity_set_token_prop ()
+{
+   # Only the optional JCM token-fallback patch reads june.local.token; the
+   # stock JCM and the primary AccountManager path do not.
+   if [ ! -f /system/etc/june/jcm_nopin.apk ] && [ ! -f /data/june/jcm_nopin.apk ]; then
+      return 0
+   fi
+   [ -f "$ID_TOKEN_FILE" ] || return 0
+   ID_TOK=`cat "$ID_TOKEN_FILE" 2>/dev/null`
+   case "$ID_TOK" in
+      v2:*) setprop june.local.token "$ID_TOK" 2>/dev/null \
+              && identity_log "setprop june.local.token for the JCM fallback patch" ;;
+   esac
+   return 0
+}
+
+ensure_june_identity ()
+{
+   mount -o rw,remount /data 2>/dev/null
+   if [ ! -f "$ID_SEED" ]; then
+      identity_log "skipped: no pre-seeded account DB at $ID_SEED"
+      identity_marker "skipped-no-seed"
+      return 0
+   fi
+   /system/bin/busybox mkdir -p /data/system/users/0 2>/dev/null
+   if [ -f "$ID_ACCOUNTS_DB" ]; then
+      if /system/bin/busybox grep -aq 'com\.junelife\.user' "$ID_ACCOUNTS_DB" 2>/dev/null; then
+         identity_log "present: June account row found in $ID_ACCOUNTS_DB (left untouched)"
+         identity_marker "present"
+         identity_ensure_record
+         identity_set_token_prop
+         return 0
+      fi
+      if [ ! -f "${ID_ACCOUNTS_DB}.pre-june" ]; then
+         if cp -f "$ID_ACCOUNTS_DB" "${ID_ACCOUNTS_DB}.pre-june" 2>/dev/null; then
+            /system/bin/busybox chmod 0600 "${ID_ACCOUNTS_DB}.pre-june" 2>/dev/null
+            identity_log "backed up the non-June accounts DB to ${ID_ACCOUNTS_DB}.pre-june"
+         else
+            identity_log "warning: could not back up the non-June accounts DB; installing the seed anyway"
+         fi
+      fi
+   fi
+   if ! cp -f "$ID_SEED" "$ID_ACCOUNTS_DB" 2>/dev/null; then
+      identity_log "failed: could not copy the seed to $ID_ACCOUNTS_DB; leaving /data as-is"
+      identity_marker "failed-copy"
+      return 0
+   fi
+   /system/bin/busybox chown 1000:1000 "$ID_ACCOUNTS_DB" 2>/dev/null
+   /system/bin/busybox chmod 0600 "$ID_ACCOUNTS_DB" 2>/dev/null
+   rm -f "${ID_ACCOUNTS_DB}-journal" "${ID_ACCOUNTS_DB}-wal" "${ID_ACCOUNTS_DB}-shm" 2>/dev/null
+   sync
+   identity_log "created: installed the June account seed at $ID_ACCOUNTS_DB (1000:1000, 0600, journal cleared)"
+   identity_marker "created"
+   identity_ensure_record
+   identity_set_token_prop
+   return 0
 }
 
 REAPERPASSFLAG="/cache/reaperpass.flag"
@@ -47,6 +159,11 @@ if [ "a$MNTDATA" != "a0" ]; then
   setprop ro.june_encfs 1
   exit 1
 fi
+
+# --- June Local: make sure a June account row exists for this boot ----------
+# Runs before Android's AccountManagerService reads accounts.db.  Never fails
+# the boot: a missing/broken seed only logs.
+ensure_june_identity
 
 if [ "$(ls -a /system/priv-app)" ]; then
     mount -o rw,remount /system

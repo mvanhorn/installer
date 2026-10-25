@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"syscall"
 )
 
 const (
@@ -104,4 +106,52 @@ func isZero(b []byte) bool {
 		}
 	}
 	return true
+}
+
+// Raw block devices cannot always be fsync'd.  macOS returns ENOTTY
+// ("inappropriate ioctl for device") for fsync(2) on /dev/rdisk*, even though
+// the writes already reached the device.  WriteBootCode reads the boot code
+// back before syncBootDevice runs, so that error means "this device cannot be
+// flushed", not "the write failed".
+var (
+	// syncFile flushes a single file.  It is a variable so tests can simulate
+	// the ENOTTY that macOS returns for raw disks.
+	syncFile = func(f *os.File) error { return f.Sync() }
+	// syncAll flushes every pending write.  platform_darwin.go sets it to
+	// sync(2), which is what macOS can do for a raw disk instead of fsync;
+	// other platforms have no equivalent call, so it stays nil there.
+	syncAll func()
+)
+
+const (
+	// The Windows syscall package defines neither of these, so compare the raw
+	// errno values; ENOTTY and EINVAL have the same numbers on macOS and Linux.
+	errnoEINVAL = syscall.Errno(22) // fsync not supported for this descriptor
+	errnoENOTTY = syscall.Errno(25) // inappropriate ioctl for device
+)
+
+// syncUnsupported reports whether err means the OS cannot fsync this file.
+func syncUnsupported(err error) bool {
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
+	}
+	return errno == errnoENOTTY || errno == errnoEINVAL
+}
+
+// syncBootDevice flushes the writes made to the boot-code device.  macOS has no
+// fsync(2) for raw disks, so it flushes with sync(2) instead (set up by the
+// darwin platform file); elsewhere the device is fsynced directly.  Either way
+// an fsync the OS does not support is success: the caller runs this only after
+// WriteBootCode's read-back has verified the bytes, and the app ejects the
+// stick afterwards.
+func syncBootDevice(f *os.File) error {
+	if syncAll != nil {
+		syncAll()
+		return nil
+	}
+	if err := syncFile(f); err != nil && !syncUnsupported(err) {
+		return err
+	}
+	return nil
 }

@@ -71,7 +71,12 @@ func handleREST(hub *Hub, cfg *Config, w http.ResponseWriter, r *http.Request) {
 		return m
 	}
 
-	// Human/phone-friendly local-mode verification.
+	// Human/phone-friendly local-mode verification. Normalize the trailing slash
+	// so /local/ does not fall through to the oven REST catch-all below.
+	if r.Method == http.MethodGet && (path == "/local/" || path == "/local/status/" || path == "/local/ca.crt/") {
+		http.Redirect(w, r, strings.TrimSuffix(path, "/"), http.StatusMovedPermanently)
+		return
+	}
 	if r.Method == "GET" && path == "/local/status" {
 		handleLocalStatus(hub, cfg, w, r)
 		return

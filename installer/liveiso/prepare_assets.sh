@@ -24,6 +24,10 @@ if [ -d "$LR/june-arch/onoven" ]; then
 else
   ARCH="$LR"
 fi
+# Onoven sources come from this repo, not the local-resources/june-arch dev
+# tree (which can be stale and lacks the identity code). ARCH still supplies
+# the built binaries/APKs/template from the local-resources tree.
+ONOVEN_SRC="$ROOT/installer/onoven"
 DEST="assets"
 rm -rf "$DEST"
 mkdir -p "$DEST"
@@ -31,23 +35,63 @@ mkdir -p "$DEST"
 # Stamp every generated script with the build time so a log pasted back from
 # the live system can be matched to the exact ISO that produced it.
 date -u +%Y%m%dT%H%M%SZ > "$DEST/BUILD_ID"
-printf '%s\n' "${JUNE_VERSION:-0.5}" > "$DEST/VERSION"
+printf '%s\n' "${JUNE_VERSION:-0.8}" > "$DEST/VERSION"
 
-cp "$ARCH/onoven/deploy_onoven.sh" "$DEST/"
-cp "$ARCH/onoven/june_bootclear.sh.onoven" "$DEST/"
-cp "$ARCH/onoven/june_reaper.sh.junelocal" "$DEST/"
+cp "$ONOVEN_SRC/deploy_onoven.sh" "$DEST/"
+cp "$ONOVEN_SRC/june_bootclear.sh.onoven" "$DEST/"
+cp "$ONOVEN_SRC/june_reaper.sh.junelocal" "$DEST/"
+# Guard against a stale onoven source tree.  A JUNE_LR pointing at the
+# local-resources/june-arch dev tree picks up its old copies of these scripts,
+# which silently ships an installer without the June identity code (no
+# account pre-seed, no boot-time self-heal) even though prepare_assets itself
+# is current.  Fail loudly instead: run prepare_assets.sh from the installer
+# repo (`installer/` here), or point JUNE_LR at it.
+if ! grep -q 'prepare_identity_assets' "$DEST/deploy_onoven.sh" || \
+   ! grep -q 'ensure_june_identity' "$DEST/june_reaper.sh.junelocal"; then
+  echo "[-] The onoven source tree at $ONOVEN_SRC is stale: the copied deploy_onoven.sh/" >&2
+  echo "[-] june_reaper.sh.junelocal are missing the June identity code." >&2
+  echo "[-] Run prepare_assets.sh from the installer repo (cd installer/installer/liveiso &&" >&2
+  echo "[-] ./prepare_assets.sh); do not point JUNE_LR at local-resources/june-arch." >&2
+  exit 1
+fi
 cp "$ARCH/companions_state.json" "$DEST/"
 cp "$ARCH/golocal/bin/june-local-linux-armv7" "$DEST/"
 cp "$ARCH/golocal/bin/june-camerad-linux-armv7" "$DEST/"
 cp "$ROOT/tools/certs/junelife_chain_godaddy_intermediate.crt" "$DEST/"
 cp "$ROOT/tools/certs/june-local.key" "$DEST/"
+# The project CA alone (not the chain): the basic install adds it to the oven's
+# trust store as a trust anchor and serves it at /local/ca.crt for the phone.
+cp "$ROOT/tools/certs/junelife.crt" "$DEST/junelife_ca.crt"
 cp "$LR/june-rcm/healthy-build/decrypted-priv-app/JuneCloudMessaging.apk" "$DEST/"
 cp "$ARCH/apk-patches/jcm-pinning/JuneCloudMessaging_nopin_signed.apk" "$DEST/"
 cp "$ARCH/apk-patches/remotes-pinning/Remotes_nopin_signed.apk" "$DEST/"
 cp "$ARCH/apk-patches/mediacapturer-pinning/MediaCapturer_nopin_signed.apk" "$DEST/"
 cp "$ARCH/apk-patches/analytics-pinning/Analytics_nopin_signed.apk" "$DEST/"
 cp "$ARCH/apk-patches/companion-endpoint/companion_endpoint_signed.apk" "$DEST/"
-cp "$ARCH/onoven/oven-light/OvenLight_signed.apk" "$DEST/"
+cp "$ONOVEN_SRC/oven-light/OvenLight_signed.apk" "$DEST/"
+# June Local DNS: a tiny helper app that advertises <hostname>.local over mDNS.
+# The APK is built Arch-side (onoven/june-dns/build.sh, not committed), so it is
+# copied into the payload from DNS_SRC or one of the default locations below.
+# Optional: a payload without it still installs (the oven is reachable by IP,
+# and a reinstall keeps any JuneDns already on the oven).
+DNS_APK="${DNS_SRC:-}"
+if [ -z "$DNS_APK" ]; then
+  for candidate in \
+    "$ARCH/onoven/june-dns/JuneDns_signed.apk" \
+    "$ONOVEN_SRC/june-dns/JuneDns_signed.apk" \
+    "$LR/onoven/june-dns/JuneDns_signed.apk"; do
+    if [ -f "$candidate" ]; then
+      DNS_APK="$candidate"
+      break
+    fi
+  done
+fi
+if [ -n "$DNS_APK" ] && [ -f "$DNS_APK" ]; then
+  cp "$DNS_APK" "$DEST/JuneDns_signed.apk"
+  echo "[*] June Local DNS helper included from $DNS_APK ($(du -h "$DNS_APK" | cut -f1))"
+else
+  echo "[!] June Local DNS helper not found (set DNS_SRC=/path/to/JuneDns_signed.apk, or build it with onoven/june-dns/build.sh and copy it to $ARCH/onoven/june-dns/ or $ONOVEN_SRC/june-dns/); <name>.local resolution will be unavailable" >&2
+fi
 # Chef cook-modes patch (optional). Built from the user's own stock Chef APK
 # with apk-patches/chef-cookmodes/build_patched.sh; June's assets are not
 # published. Without it the oven keeps the stock primitive whitelist.
@@ -89,6 +133,373 @@ else
   cp "$LR/june-rcm/tegrarcm/src/tegrarcm" "$DEST/tegrarcm"
 fi
 
+# --- June Local identity seed assets ---------------------------------------
+# The June apps need one Android AccountManager row (account type
+# "com.junelife.user", authtoken "Full access") in /data.  A factory reset wipes
+# that DB, which leaves the oven "disconnected" even with a correct install, so
+# the installer ships a per-oven seed and june_reaper.sh installs it before
+# Android starts when the row is missing.  The seed is generated at install time
+# from accounts_template.db; the template is cloned from a captured oven DB with
+# every account/authtoken/extra row stripped, so the captured cloud token never
+# ships in the ISO.  See docs/identity-generation.md.
+cat > "$DEST/generate_identity.py" <<'PYEOF'
+#!/usr/bin/env python3
+"""June Local per-oven identity seed generator.
+
+The June oven apps read one Android AccountManager account row from
+/data/system/users/0/accounts.db: account type "com.junelife.user", authtoken
+type "Full access".  A factory reset wipes that DB, which drops the JCM's
+bearer token and leaves the oven "disconnected" even when the install itself is
+correct.  The installer therefore ships a seed DB in /system, and
+june_reaper.sh installs it before Android starts when the June row is missing.
+
+Commands:
+  make-template SRC_CAPTURED_DB OUT_DB
+      Build-time.  Clone the schema and the `meta` rows of a captured oven
+      accounts.db into a template DB with NO account/authtoken/extra rows, so
+      the captured cloud token never ships in the ISO.  The schema is copied
+      from sqlite_master verbatim (with PRAGMA user_version); nothing is
+      hand-authored.
+
+  make-seed TEMPLATE_DB OUT_DB TOKEN
+      Install-time.  Clone the template, replace the (empty) rows with one June
+      account, the per-oven "Full access" token and the "Refresh access" extra,
+      then verify integrity and that no other v2: token is present.
+
+  mint-token
+      Print a fresh token in the observed cloud format: v2: + 28 chars of
+      URL-safe base64 (21 random bytes).
+
+  check DB
+      Print a short integrity/summary of a template or seed DB.
+
+See docs/identity-generation.md for the design and the account schema.
+"""
+
+import base64
+import hashlib
+import os
+import re
+import shutil
+import sqlite3
+import sys
+import urllib.parse
+
+ACCOUNT_TYPE = "com.junelife.user"
+ACCOUNT_NAME = "June Oven"
+AUTHTOKEN_FULL = "Full access"
+AUTHTOKEN_REFRESH = "Refresh access"
+REFRESH_VALUE = "Refresh access to account"
+REQUIRED_TABLES = ("accounts", "authtokens", "extras")
+META_TABLE = "meta"
+TOKEN_RE = re.compile(r"v2:[A-Za-z0-9_-]{28}")
+TOKEN_BYTES_RE = re.compile(rb"v2:[A-Za-z0-9_-]{20,}")
+
+
+def fail(message):
+    sys.stderr.write("generate_identity.py: error: %s\n" % message)
+    raise SystemExit(1)
+
+
+def connect_ro(path):
+    if not os.path.isfile(path):
+        fail("missing database: %s" % path)
+    # sqlite3 opens read/write by default; mode=ro keeps the captured template
+    # untouched (it may live on a read-only or shared build volume).
+    uri = "file:%s?mode=ro" % urllib.parse.quote(path)
+    try:
+        return sqlite3.connect(uri, uri=True)
+    except sqlite3.Error as exc:
+        fail("cannot open %s: %s" % (path, exc))
+
+
+def table_names(conn):
+    return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+
+
+def scan_for_tokens(blob, label):
+    found = TOKEN_BYTES_RE.findall(blob)
+    if found:
+        fail("%s contains v2: token data (%d match(es)); refusing to ship the "
+             "captured cloud token" % (label, len(found)))
+
+
+def schema_statements(conn):
+    rows = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL "
+        "AND name NOT LIKE 'sqlite_%' "
+        "ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 ELSE 2 END, name"
+    ).fetchall()
+    if not rows:
+        fail("captured database has no schema")
+    return [row[0] for row in rows]
+
+
+def integrity_ok(path):
+    db = sqlite3.connect(path)
+    try:
+        result = db.execute("PRAGMA integrity_check").fetchone()[0]
+    finally:
+        db.close()
+    if result != "ok":
+        fail("integrity_check failed for %s: %s" % (path, result))
+
+
+def summarize(path):
+    db = sqlite3.connect(path)
+    try:
+        june_accounts = db.execute(
+            "SELECT count(*) FROM accounts WHERE type=?", (ACCOUNT_TYPE,)
+        ).fetchone()[0]
+        accounts = db.execute("SELECT count(*) FROM accounts").fetchone()[0]
+        authtokens = db.execute("SELECT count(*) FROM authtokens").fetchone()[0]
+        extras = db.execute("SELECT count(*) FROM extras").fetchone()[0]
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        db.close()
+    integrity_ok(path)
+    print("check: %s integrity ok, accounts %d total / %d June, authtokens %d, "
+          "extras %d, user_version %d"
+          % (path, accounts, june_accounts, authtokens, extras, version))
+    return june_accounts
+
+
+def make_template(src_path, out_path):
+    src = connect_ro(src_path)
+    try:
+        names = table_names(src)
+        missing = [name for name in REQUIRED_TABLES if name not in names]
+        if missing:
+            fail("captured DB is missing table(s) %s; it is not an Android "
+                 "accounts database" % ", ".join(missing))
+        if META_TABLE not in names:
+            fail("captured DB has no %s table; refusing to hand-author the "
+                 "Android schema version" % META_TABLE)
+        statements = schema_statements(src)
+        meta_cols = [row[1] for row in src.execute("PRAGMA table_info(%s)" % META_TABLE)]
+        if not meta_cols:
+            fail("captured DB %s table has no columns" % META_TABLE)
+        meta_rows = src.execute("SELECT * FROM %s" % META_TABLE).fetchall()
+        user_version = src.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        src.close()
+
+    for statement in statements:
+        scan_for_tokens(statement.encode("utf-8", "replace"), "captured schema")
+
+    if os.path.exists(out_path):
+        os.remove(out_path)
+    out = sqlite3.connect(out_path)
+    try:
+        out.execute("PRAGMA secure_delete=ON")
+        for statement in statements:
+            out.execute(statement)
+        if meta_rows:
+            columns = ", ".join('"%s"' % col.replace('"', '""') for col in meta_cols)
+            marks = ", ".join(["?"] * len(meta_cols))
+            out.executemany(
+                "INSERT INTO %s (%s) VALUES (%s)" % (META_TABLE, columns, marks),
+                meta_rows,
+            )
+        out.commit()
+    finally:
+        out.close()
+
+    # The template must carry the schema/meta only: no rows and no captured
+    # token bytes, including stale bytes left in free pages.
+    try:
+        blob = open(out_path, "rb").read()
+    except OSError as exc:
+        fail("cannot read back %s: %s" % (out_path, exc))
+    scan_for_tokens(blob, "generated template")
+    db = sqlite3.connect(out_path)
+    try:
+        for table in REQUIRED_TABLES:
+            count = db.execute("SELECT count(*) FROM %s" % table).fetchone()[0]
+            if count != 0:
+                fail("template table %s has %d row(s); the template must be "
+                     "row-free" % (table, count))
+    finally:
+        db.close()
+    if user_version:
+        db = sqlite3.connect(out_path)
+        try:
+            db.execute("PRAGMA user_version=%d" % int(user_version))
+            db.commit()
+        finally:
+            db.close()
+    summarize(out_path)
+    print("template: %s (%d schema statement(s), %d meta row(s))"
+          % (out_path, len(statements), len(meta_rows)))
+
+
+def make_seed(template_path, out_path, token):
+    if not TOKEN_RE.fullmatch(token):
+        fail("token does not match v2:<28 url-safe base64 chars>: %r" % token)
+    if not os.path.isfile(template_path):
+        fail("missing accounts template: %s" % template_path)
+    shutil.copyfile(template_path, out_path)
+    db = sqlite3.connect(out_path)
+    try:
+        db.execute("PRAGMA secure_delete=ON")
+        db.execute("DELETE FROM accounts")
+        db.execute("DELETE FROM authtokens")
+        db.execute("DELETE FROM extras")
+        cursor = db.execute(
+            "INSERT INTO accounts (name, type) VALUES (?, ?)",
+            (ACCOUNT_NAME, ACCOUNT_TYPE),
+        )
+        account_id = cursor.lastrowid
+        db.executemany(
+            "INSERT INTO authtokens (accounts_id, type, authtoken) VALUES (?, ?, ?)",
+            [(account_id, AUTHTOKEN_FULL, token),
+             (account_id, AUTHTOKEN_REFRESH, token)],
+        )
+        db.execute(
+            "INSERT INTO extras (accounts_id, key, value) VALUES (?, ?, ?)",
+            (account_id, AUTHTOKEN_REFRESH, REFRESH_VALUE),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    # Prove the seed contains this oven's token and no other v2: credential.
+    try:
+        blob = open(out_path, "rb").read()
+    except OSError as exc:
+        fail("cannot read back %s: %s" % (out_path, exc))
+    found = {match.group(0).decode("ascii") for match in TOKEN_BYTES_RE.finditer(blob)}
+    foreign = sorted(found - {token})
+    if foreign:
+        fail("seed contains %d token(s) other than the minted one; refusing "
+             "(the captured cloud token must not be reused)" % len(foreign))
+    count = summarize(out_path)
+    if count != 1:
+        fail("seed has %d June account row(s), expected exactly 1" % count)
+    db = sqlite3.connect(out_path)
+    try:
+        stored = db.execute(
+            "SELECT authtoken FROM authtokens WHERE accounts_id=? AND type=?",
+            (1, AUTHTOKEN_FULL),
+        ).fetchone()
+    finally:
+        db.close()
+    if not stored or stored[0] != token:
+        fail("seed does not carry the minted Full access token")
+    digest = hashlib.sha256(token.encode("ascii")).hexdigest()[:8]
+    print("seed: %s (one %s account, token sha256 prefix %s)"
+          % (out_path, ACCOUNT_TYPE, digest))
+
+
+def mint_token():
+    raw = base64.urlsafe_b64encode(os.urandom(21)).decode("ascii").rstrip("=")
+    token = "v2:" + raw
+    if not TOKEN_RE.fullmatch(token):
+        fail("minted token has the wrong shape: %r" % token)
+    print(token)
+
+
+def usage():
+    sys.stderr.write(
+        "usage: generate_identity.py make-template SRC_CAPTURED_DB OUT_DB\n"
+        "       generate_identity.py make-seed TEMPLATE_DB OUT_DB TOKEN\n"
+        "       generate_identity.py mint-token\n"
+        "       generate_identity.py check DB\n"
+    )
+
+
+def main(argv):
+    if len(argv) < 2:
+        usage()
+        return 2
+    command = argv[1]
+    try:
+        if command == "make-template" and len(argv) == 4:
+            make_template(argv[2], argv[3])
+        elif command == "make-seed" and len(argv) == 5:
+            make_seed(argv[2], argv[3], argv[4])
+        elif command == "mint-token" and len(argv) == 2:
+            mint_token()
+        elif command == "check" and len(argv) == 3:
+            summarize(argv[2])
+        else:
+            usage()
+            return 2
+    except sqlite3.Error as exc:
+        fail("sqlite error: %s" % exc)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+PYEOF
+chmod 0755 "$DEST/generate_identity.py"
+
+# Build the row-free template from a captured oven DB.  This step is required:
+# without it the ISO would install without account self-heal, so a factory-reset
+# oven would stay disconnected.  python3 is already required for the installer
+# GUI; on a Git-Bash/Windows build host `python` may be a Windows binary, so
+# convert the one absolute path we hand it via cygpath.
+PYTHON="${PYTHON:-}"
+if [ -z "$PYTHON" ]; then
+  for candidate in python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      PYTHON="$candidate"
+      break
+    fi
+  done
+fi
+identity_template_src="${JUNE_ACCOUNTS_TEMPLATE:-}"
+if [ -z "$identity_template_src" ]; then
+  for candidate in \
+    "$ROOT/local-resources/june-arch/capture/factory-reset-20260923/accounts_inject.db" \
+    "$ARCH/capture/factory-reset-20260923/accounts_inject.db" \
+    "$LR/capture/factory-reset-20260923/accounts_inject.db" \
+    "$ARCH/capture/accounts_inject.db"; do
+    if [ -f "$candidate" ]; then
+      identity_template_src="$candidate"
+      break
+    fi
+  done
+fi
+identity_template_missing() {
+  # Dev-only escape hatch, clearly named: a published/source-only tree without
+  # the captured DB can still build, but the ISO cannot self-heal after a reset.
+  if [ "${JUNE_ALLOW_NO_IDENTITY_TEMPLATE:-0}" = "1" ]; then
+    echo "[!] JUNE_ALLOW_NO_IDENTITY_TEMPLATE=1: building without an identity seed template." >&2
+    echo "[!] The ISO will install without account self-heal; a factory-reset oven will stay disconnected." >&2
+    return 0
+  fi
+  echo "[-] No captured June accounts DB found; refusing to build the installer." >&2
+  echo "[-] Looked for: ${identity_template_src:-local-resources/june-arch/capture/factory-reset-20260923/accounts_inject.db}" >&2
+  echo "[-] Set JUNE_ACCOUNTS_TEMPLATE=/path/to/accounts_inject.db (captured pre-reset UDA) or place" >&2
+  echo "[-] it at local-resources/june-arch/capture/factory-reset-20260923/accounts_inject.db, then re-run." >&2
+  echo "[-] Without it the ISO installs without account self-heal; see docs/identity-generation.md." >&2
+  exit 1
+}
+if [ ! -f "$identity_template_src" ]; then
+  identity_template_missing
+else
+  if [ -z "$PYTHON" ]; then
+    echo "[-] python3 is required to build the identity seed template ($DEST/accounts_template.db)." >&2
+    echo "[-] Install python3 on the build host, then re-run prepare_assets.sh." >&2
+    echo "[-] Without it the ISO installs without account self-heal; see docs/identity-generation.md." >&2
+    exit 1
+  fi
+  identity_template_arg="$identity_template_src"
+  if command -v cygpath >/dev/null 2>&1; then
+    identity_template_arg="$(cygpath -w "$identity_template_src")"
+  fi
+  if ! "$PYTHON" "$DEST/generate_identity.py" make-template \
+      "$identity_template_arg" "$DEST/accounts_template.db"; then
+    echo "[-] Could not build the identity seed template from $identity_template_src." >&2
+    echo "[-] Refusing to build an installer that cannot self-heal after a factory reset." >&2
+    echo "[-] See docs/identity-generation.md." >&2
+    exit 1
+  fi
+  echo "[*] identity seed template generated from $(basename "$identity_template_src")"
+fi
+
 cat > "$DEST/install.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -105,7 +516,7 @@ EXPECTED_SIZE="7818182656"
 TEGRARCM="$DIR/tegrarcm"
 GUIDE_URL="https://project-july.org/setup"
 BUILD_ID="$(cat "$DIR/BUILD_ID" 2>/dev/null || echo unknown)"
-VERSION="$(cat "$DIR/VERSION" 2>/dev/null || echo 0.5)"
+VERSION="$(cat "$DIR/VERSION" 2>/dev/null || echo 0.8)"
 export JUNE_VERSION="$VERSION"
 export JUNE_BUILD_ID="$BUILD_ID"
 echo "[*] June Local $VERSION (build $BUILD_ID)"
@@ -332,6 +743,10 @@ wait_for_ums() {
 BOOT_OR_ROOT_DISK="$(boot_or_root_disk || true)"
 
 if [ "$MODE" = "generate" ]; then
+  # Explicit provenance for deploy_onoven.sh: custom = per-home CA plus no-pin
+  # network clients; the per-home CA is added to the oven's trust store.
+  export INSTALL_MODE="custom"
+  export CA_MODE="per-home"
   OVEN_IP="${2:-}"
   OVEN_HOST="${3:-}"
   PERSIST="${4:-}"
@@ -383,6 +798,13 @@ if [ "$MODE" = "generate" ]; then
     echo "[-] CA save: the generated CA is still available at $DIR/certs." >&2
   fi
 else
+  # Explicit provenance for deploy_onoven.sh: basic = factory apps plus the
+  # bundled project chain.  That chain's leaf is issued by the project CA, which
+  # is installed as a trust anchor in the oven's trust store (CA_MODE=project):
+  # without it a clean oven rejects june-local's TLS certificate and the stock
+  # June apps never connect.
+  export INSTALL_MODE="basic"
+  export CA_MODE="project"
   # Standard ("prepackaged") install keeps the oven's factory
   # JuneCloudMessaging app, so there is no patch payload to persist unless the
   # user opts in. Persistence is only meaningful together with the no-pin
@@ -406,7 +828,8 @@ else
   else
     export JCM_SRC="$DIR/JuneCloudMessaging.apk"
   fi
-  # Prepackaged installs keep the GoDaddy chain, which the factory pins accept.
+  # Prepackaged installs serve the bundled project chain; the project CA that
+  # signs it is installed as a trust anchor by deploy_onoven.sh.
   export REMOTES_SRC=""
   export CERT_SRC="$DIR/junelife_chain_godaddy_intermediate.crt"
   export KEY_SRC="$DIR/june-local.key"
@@ -414,12 +837,17 @@ else
   # cook-time stills cannot reach june-local. Use the no-pin build in basic
   # mode too; without it the live view is blank while a cook is running.
   export MEDIACAPTURER_SRC="$DIR/MediaCapturer_nopin_signed.apk"
-  # Basic installs have no per-home CA; serve the factory GoDaddy chain from
-  # /local/ca.crt so the status page's download works here too.
-  export CA_SRC="$DIR/junelife_chain_godaddy_intermediate.crt"
+  # The project CA alone (not the chain) is served at /local/ca.crt for the
+  # phone to install, and deploy_onoven.sh installs the same file as
+  # /system/etc/security/cacerts/$CA_HASH.0 in the oven.  Without the oven-side
+  # anchor a clean oven rejects june-local's TLS certificate.
+  CA_SRC="$DIR/junelife_ca.crt"
+  CA_HASH="$(openssl x509 -in "$CA_SRC" -subject_hash_old -noout)"
+  export CA_SRC CA_HASH
 fi
 
 echo "[debug] MODE=$MODE"
+echo "[debug] INSTALL_MODE=$INSTALL_MODE CA_MODE=$CA_MODE"
 echo "[debug] JCM_PERSIST=$JCM_PERSIST"
 echo "[debug] CERT_SRC=$(basename "$CERT_SRC")"
 echo "[debug] JCM_SRC=$(basename "$JCM_SRC")"
@@ -495,14 +923,24 @@ echo
 if [ "$MODE" = "generate" ]; then
   echo "Phone setup:"
   echo "  1. Install companion_endpoint_signed.apk."
-  echo "  2. Set the endpoint to $OVEN_IP."
+  echo "  2. Set the endpoint to $OVEN_IP (Connect by IP). The JuneDns helper advertises"
+  echo "     $OVEN_HOST; use that name instead if it resolves. Add a local DNS entry if"
+  echo "     multicast (mDNS) is blocked; the IP always works."
   echo "  3. Install the per-home CA on the phone: $DIR/certs/ca.crt"
   echo "  4. Open the June app and pair/control the oven."
 else
   echo "Phone setup:"
   echo "  1. Install companion_endpoint_signed.apk."
-  echo "  2. Set the endpoint to the oven's LAN IP."
-  echo "  3. Open the June app and pair/control the oven."
+  echo "  2. Use june.local, june2.local or june3.local: the JuneDns helper on the oven"
+  echo "     advertises <name>.local. If multicast (mDNS) is blocked, add a local DNS"
+  echo "     entry or use Connect by IP instead. The basic certificate does not include"
+  echo "     the raw IP."
+  echo "  3. Install the project CA on the phone so it trusts june-local:"
+  echo "     download it from http://<oven-ip>/local/ca.crt"
+  echo "  4. Set the companion app endpoint to june.local (or the name you used)."
+  echo "  5. (Advanced) stock June app: point api.junelife.com and messaging.junelife.com"
+  echo "     at the oven in your router DNS."
+  echo "  6. Open the June app and pair/control the oven."
 fi
 echo
 echo "How to know it worked: after phone setup, open the June app and try to"

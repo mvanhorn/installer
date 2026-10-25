@@ -16,6 +16,36 @@ Source: `june-rcm/healthy-build/decrypted-priv-app/JuneCloudMessaging.apk`
 
 Endpoint hostnames were NOT changed.
 
+## Optional token fallback (bench-gated, UNPROVEN — do not ship yet)
+
+Layer A1 from `docs/identity-generation.md` / `docs/jcm-token-fallback.md`: make the
+already-patched JCM keep a non-null `Authorization` header when AccountManager has no
+June account. `DeferredAuthTokenHolder.getAuthToken()/forceRefresh()` and
+`AuthDecorator.ensureLatestHeaders(String)` fall back to
+`SystemProperties.get("june.local.token")`, then `account.token` in
+`/data/june/identity.json`, then a compiled-in `v2:` token. **AccountManager is still
+tried first**, so a normal oven is unaffected.
+
+Build it as a separate artifact on the Arch host (never overwrite the shipped APK):
+
+```bash
+bash build_nopin.sh /path/to/JuneCloudMessaging.apk --token-fallback
+# -> JuneCloudMessaging_nopin_fallback_signed.apk
+```
+
+This is **bench-only** until the P4 test in `docs/jcm-token-fallback.md` passes: if the
+JCM has an additional account-presence gate, the fallback alone will not open the socket.
+Do not copy this APK into the live ISO payload (`prepare_assets.sh`) or ship it before
+that test.
+
+The fallback smali is generated from string templates, where a wrong `if-eqz`/`if-nez`
+polarity silently breaks the order (the first revision had exactly that bug). Run the
+interpreter-based regression test after any edit:
+
+```bash
+python3 test_patch.py     # python3 only; no java/apktool/oven needed
+```
+
 ## Build
 ```bash
 bash build_nopin.sh

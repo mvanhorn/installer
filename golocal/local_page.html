@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>June Local {{VERSION}}</title>
+<title>June Local {{INSTALLER_VERSION}} · server {{VERSION}}</title>
 <style>
 :root{--bg:#07090d;--card:#11161f;--line:#222b3a;--text:#e6edf7;--dim:#8fa0b8;--ok:#34d399;--amber:#fbbf24;--red:#f87171;--accent:#38bdf8}
 *{box-sizing:border-box}
@@ -44,10 +44,10 @@ noscript{display:block;background:#1a1608;border:1px solid #4a3b12;padding:12px;
 <main>
 <header>
   <div class="dot {{HEADLINE_CLASS}}" id="dot"></div>
-  <div><h1 id="headline">{{HEADLINE}}</h1><p class="sub" id="subline">June Local {{VERSION}}</p></div>
+  <div><h1 id="headline">{{HEADLINE}}</h1><p class="sub" id="subline">June Local {{INSTALLER_VERSION}} · server {{VERSION}}</p></div>
 </header>
 <noscript>
-  <p><b>June Local {{VERSION}}</b>. JavaScript is off, so this page shows a summary only.
+  <p><b>June Local {{INSTALLER_VERSION}} · server {{VERSION}}</b>. JavaScript is off, so this page shows a summary only.
   <a href="/local/status">Open the status JSON</a> or <a href="/local/ca.crt">download the CA</a>.</p>
 </noscript>
 <section class="tiles" id="tiles"></section>
@@ -55,9 +55,10 @@ noscript{display:block;background:#1a1608;border:1px solid #4a3b12;padding:12px;
 <section id="sections"></section>
 <footer>
   <button id="copy">Copy diagnostics</button>
+  <a href="/local/status" download="june-local-status.json">Download diagnostics</a>
   <a href="/local/cook.html">Cook view</a>
   <a href="/local/ca.crt">CA certificate</a>
-  <a href="https://github.com/prj-july/installer/releases/tag/{{VERSION}}">Release notes</a>
+  <a href="https://github.com/prj-july/installer/releases/tag/v{{INSTALLER_VERSION}}">Release notes</a>
   <a href="https://project-july.org/setup">Setup guide</a>
   <a href="https://github.com/prj-july/installer">Repository</a>
   <a href="https://github.com/prj-july/installer/issues/new">Report a problem</a>
@@ -89,19 +90,34 @@ function details(id, title, body, open) { return `<details id="${id}" ${open?'op
 
 function render(d) {
   const worst = (d.problems || []).find(p => p.severity === 'red') || (d.problems || []).find(p => p.severity === 'amber');
+  const ident = (d.oven && d.oven.identity) || {};
   const sev = worst ? worst.severity : 'ok';
   $('dot').className = 'dot ' + (sev === 'ok' ? '' : sev);
   $('headline').textContent = worst ? worst.title : 'All good';
-  $('subline').textContent = `June Local ${d.version.version} · ${d.version.commit} · up ${Math.round(d.version.uptime_seconds/3600)} h`;
+  $('subline').textContent = `June Local ${d.install.installer_version || 'unknown'} · server ${d.version.version} (${d.version.commit}) · up ${Math.round(d.version.uptime_seconds/3600)} h`;
   $('tiles').innerHTML =
     tile('Oven', d.oven.connection === 'connected' ? 'Connected' : 'Offline', `last message ${secs(d.oven.last_frame_age_seconds)}`, d.oven.connection === 'connected' ? 'ok' : 'red') +
+    tile('Identity', ident.account_present ? 'Present' : 'Missing',
+      ident.token_prefix ? `${ident.token_prefix} · ${ident.token_source}` : (ident.token_source === 'none' ? 'no local token' : ident.token_source),
+      ident.account_present ? 'ok' : 'red') +
     tile('Cooking', d.cook.state === 'idle' ? 'Idle' : (d.cook.mode || 'Cooking'), cookSub(d.cook), d.cook.state === 'idle' ? '' : 'ok') +
     tile('Camera', d.camera.camerad_running ? 'Running' : 'Down', `last frame ${secs(d.camera.last_frame_age_seconds)}`, d.camera.last_frame_age_seconds > 20 ? 'amber' : 'ok') +
-    tile('Version', d.version.version, `${d.version.commit} · ${d.version.build_date}`);
+    tile('Installer', (d.install && d.install.installer_version) || 'unknown', (d.install && d.install.build_id) || '') +
+    tile('Server', d.version.version, `${d.version.commit} · ${d.version.build_date}`);
 
   $('problems').innerHTML = (d.problems || []).map(p => `<div class="prob ${p.severity}"><b>${esc(p.title)}</b><div>${esc(p.detail)}</div><div class="fix">${esc(p.fix)}</div></div>`).join('');
 
-  const comps = (d.install.components || []).map(c => row(`${c.ok ? '✓' : '✗'} ${c.name}`, c.expected ? (c.actual ? c.actual.slice(0,8) + (c.expected === c.actual ? '' : ' ≠ ' + c.expected.slice(0,8)) : 'unread') : (c.actual ? c.actual.slice(0,8) : ''), c.ok ? 'ok' : 'amber')).join('');
+  const compsList = d.install.components || [];
+  const comps = compsList.map(c => {
+    const verified = !!c.expected;
+    const mark = verified ? (c.ok ? '✓' : '✗') : '•';
+    const hash = c.actual ? c.actual.slice(0,8) : '';
+    const note = verified ? (c.expected === c.actual ? '' : ' ≠ ' + c.expected.slice(0,8)) : ' factory (no expected hash)';
+    return row(`${mark} ${c.name}`, hash + note, verified ? (c.ok ? 'ok' : 'amber') : 'amber');
+  }).join('');
+  const presentCount = compsList.filter(c => c.ok).length;
+  const verifiedCount = compsList.filter(c => c.expected && c.ok).length;
+  const factoryCount = compsList.filter(c => !c.expected).length;
   const clients = (d.clients.items || []).map(c => row(`${c.name} (${c.platform || 'client'})`, `${c.paired ? 'paired' : 'unpaired'} · ${c.connected ? 'connected' : 'idle'} · ${secs(c.last_seen_seconds)}`, c.paired ? 'ok' : 'amber')).join('') || '<p>No paired clients.</p>';
   const cert = row('Subject', d.cert.subject) + row('SANs', (d.cert.sans||[]).join(', ')) + row('Issuer', d.cert.issuer) +
     row('Valid until', `${d.cert.not_after} (${d.cert.days_remaining} days)`, d.cert.days_remaining < 30 ? 'amber' : 'ok') +
@@ -110,20 +126,40 @@ function render(d) {
     row('CA in system store', d.cert.ca_in_system_store ? 'yes' : 'no', d.cert.ca_in_system_store ? 'ok' : 'amber') +
     row('Covers current IP', d.cert.san_covers_current_ip ? 'yes' : 'no', d.cert.san_covers_current_ip ? 'ok' : 'amber') +
     `<p><a href="/local/ca.crt">Download CA / chain</a> — check the fingerprint matches the one shown by the installer.</p>`;
-  const net = row('IP', (d.network.ips||[]).join(', ')) + row('Hostname', d.network.mdns || d.network.hostname) +
+  const net = row('IP', (d.network.ips||[]).join(', ')) + row('Hostname', d.network.hostname || '') +
+    row('mDNS', d.network.mdns ? `${d.network.mdns} (configured; use the IP if it does not resolve)` : 'not configured') +
     row('Ports', `TLS ${d.network.tls_port} · HTTP ${d.network.http_port}`) + row('Hosts override', d.network.hosts_overrides ? 'yes' : 'no') +
     row('HA client', d.network.ha_client_version || 'not seen') + row('Gateway', d.network.gateway || '') + row('DNS', (d.network.dns||[]).join(', '));
   const storage = row('Data free', d.storage.data_free_pct.toFixed(1) + '%', d.storage.data_free_pct < 10 ? 'amber' : 'ok') +
     row('Collector free', d.storage.collector_free_pct.toFixed(1) + '%', d.storage.collector_free_pct < 10 ? 'amber' : 'ok') +
     row('Log', bytes(d.storage.log_bytes)) + row('JSONL', bytes(d.storage.jsonl_bytes)) + row('Media', bytes(d.storage.media_bytes)) + row('Latest frame', bytes(d.storage.latest_frame_bytes));
-  const provenance = row('Install', `${d.install.mode || 'unknown'} · ${d.install.date || ''}`) + row('Installer', d.install.installer_version || '') +
-    row('Build ID', d.install.build_id || '') + row('Persistence', d.install.persistence || '') + row('CA mode', d.install.ca_mode || '') +
+  const customFlow = compsList.some(c => c.name === 'Remotes' && c.expected);
+  const flow = customFlow ? 'custom (per-home CA + no-pin apps)' : 'basic (factory June apps)';
+  const provenance = row('Install', `${flow} · ${d.install.date || ''}`) +
+    row('install.json mode', d.install.mode || 'unknown') +
+    row('Server', `${d.version.version} · ${d.version.commit} · ${d.version.build_date}`) +
+    row('Installer', `${d.install.installer_version || 'unknown'} · ${d.install.build_id || ''}`) +
+    row('Persistence', d.install.persistence || '') +
+    row('CA issuer', `${d.cert.issuer || 'unknown'} · recorded: ${d.install.ca_mode || 'unknown'}`) +
     row('Hostname', d.install.hostname || '') + row('Install IP', d.install.install_ip || '') + row('Presets', `${d.presets.catalog_entries} entries · ${bytes(d.presets.upstream_bytes)}`);
   const cam = row('june-camerad', d.camera.camerad_running ? 'running' : 'stopped', d.camera.camerad_running ? 'ok' : 'red') +
     row('Stock socket', d.camera.stock_socket ? 'present' : 'missing', d.camera.stock_socket ? 'ok' : 'amber') + row('Viewer gate', d.camera.viewer_gate ? 'open' : 'closed') +
     row('Last frame', secs(d.camera.last_frame_age_seconds)) + row('Light helper', d.light.helper_installed ? 'installed' : 'missing', d.light.helper_installed ? 'ok' : 'amber') +
     row('Light scene', d.light.scene_on ? 'on' : 'off') + row('Last light result', d.light.last_result || 'none');
-  $('sections').innerHTML = details('sec-install','Install & components',comps + row('Summary', `${(d.install.components||[]).filter(c=>c.ok).length}/${(d.install.components||[]).length} components ok`)) +
+  // The June account row is what the oven's app reads for its bearer token.
+  // A factory reset wipes it; only the pre-Android boot ensure can put it back,
+  // so this section is the first thing support needs for a "connected" oven
+  // that never connects.
+  const identity = row('June account row', ident.account_present ? 'present' : 'missing', ident.account_present ? 'ok' : 'red') +
+    row('Account name', ident.account_name || (ident.account_present ? 'unreadable' : '—')) +
+    row('Token type', ident.token_type || '—') +
+    row('Token source', ident.token_source || 'none') +
+    row('Token prefix', ident.token_prefix || '—') +
+    `<p>Read from <span class="mono">/data/system/users/0/accounts.db</span> and <span class="mono">/data/june/identity.json</span>. ` +
+    `The full token is never shown. A <b>factory reset</b> wipes this row; it is re-created by the boot-time identity ensure from the installer seed on the next boot. ` +
+    `june-local cannot create it at runtime — if it stays missing after a reboot, reinstall from the current USB image and check /data/june/logs/identity.log.</p>`;
+  $('sections').innerHTML = details('sec-install','Install & components',comps + row('Summary', `${presentCount}/${compsList.length} present · ${verifiedCount} hash-verified · ${factoryCount} factory`)) +
+    details('sec-identity','Local identity',identity) +
     details('sec-clients','Clients & pairing',clients) +
     details('sec-camera','Camera & light',cam) +
     details('sec-cert','Certificate',cert) +
@@ -132,14 +168,39 @@ function render(d) {
     details('sec-provenance','Provenance',provenance) +
     details('sec-errors','Recent errors',(d.errors||[]).map(e=>row(e.time, `${e.source}: ${e.message}`)).join('') || '<p>None.</p>');
 
-  const open = {}; (d.problems||[]).forEach(p => { const m = { 'oven-disconnected':'sec-network','factory-fallback':'sec-install','camera-bridge':'sec-camera','light-bridge':'sec-camera','cert-expiry':'sec-cert','cert-ip-mismatch':'sec-cert','storage-low':'sec-storage' }; if (m[p.id]) open[m[p.id]] = 1; });
+  const open = {}; (d.problems||[]).forEach(p => { const m = { 'oven-disconnected':'sec-network','identity-missing':'sec-identity','cert-untrusted':'sec-cert','factory-fallback':'sec-install','camera-bridge':'sec-camera','light-bridge':'sec-camera','cert-expiry':'sec-cert','cert-ip-mismatch':'sec-cert','storage-low':'sec-storage' }; if (m[p.id]) open[m[p.id]] = 1; });
   Object.keys(open).forEach(id => { const el = $(id); if (el) el.open = true; });
 }
 
 function refresh() { fetch('/local/status', {cache:'no-store'}).then(r=>r.json()).then(j=>{data=j;render(j);}).catch(()=>{}); }
+function copyText(txt) {
+  // navigator.clipboard is only available in a secure context. /local is
+  // normally opened over plain HTTP on the oven's LAN IP, so fall back to the
+  // old textarea + execCommand path there instead of silently doing nothing.
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(txt);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = txt;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-1000px';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok ? Promise.resolve() : Promise.reject(new Error('copy unavailable'));
+}
 $('copy').addEventListener('click', () => {
   const txt = '```json\n' + JSON.stringify(data, null, 2) + '\n```';
-  navigator.clipboard.writeText(txt).then(()=>{$('copy').textContent='Copied';setTimeout(()=>$('copy').textContent='Copy diagnostics',1500);});
+  copyText(txt).then(() => {
+    $('copy').textContent = 'Copied';
+    setTimeout(() => { $('copy').textContent = 'Copy diagnostics'; }, 1500);
+  }).catch(() => {
+    $('copy').textContent = 'Copy failed — use Download diagnostics';
+    setTimeout(() => { $('copy').textContent = 'Copy diagnostics'; }, 3500);
+  });
 });
 render(initial);
 setInterval(()=>{ if(!document.hidden) refresh(); }, 7000);
