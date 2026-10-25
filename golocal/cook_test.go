@@ -200,3 +200,36 @@ func TestFixtureFileRoundTrip(t *testing.T) {
 		t.Fatalf("idle fixture = %+v", v)
 	}
 }
+
+func TestEndedCookIsLastCook(t *testing.T) {
+	hub := newHub(true, "")
+	hub.setDeviceState(json.RawMessage(`{"state":"active"}`))
+	hub.setCookPlan(json.RawMessage(`{"food":{"name":"bake","plan":{"steps":[{"cook_mode":"bake_standard","temperature_cavity":176667,"exit_criteria":[{"type":"duration","target":{"value":900000}}]}]}}}`))
+	if c := parseCook(hub.statusSnapshot()); c.State != "active" || c.Mode != "bake_standard" || c.LastCook != nil {
+		t.Fatalf("live cook = %+v", c)
+	}
+
+	hub.endCook() // 10017 CookPlanEnded; device state still says active
+	c := parseCook(hub.statusSnapshot())
+	if c.State != "idle" || c.Mode != "" || c.TargetC != 0 || c.EtaSeconds != 0 || c.RemainingSeconds != 0 || c.Plan != nil {
+		t.Fatalf("ended cook still looks live: %+v", c)
+	}
+	if c.LastCook == nil || c.LastCook.Mode != "bake_standard" || c.LastCook.TargetC != 176.667 || c.LastCook.EndedAt == "" {
+		t.Fatalf("last cook = %+v", c.LastCook)
+	}
+
+	hub.setCookPlan(json.RawMessage(`{"food":{"plan":{"steps":[{"cook_mode":"broil"}]}}}`)) // next cook starts
+	if c := parseCook(hub.statusSnapshot()); c.State != "active" || c.Mode != "broil" || c.LastCook != nil {
+		t.Fatalf("new cook = %+v", c)
+	}
+}
+
+func TestIdleWithCachedPlanIsLastCook(t *testing.T) {
+	c := parseCook(StatusSnapshot{
+		DeviceState: json.RawMessage(`{"state":"idle"}`),
+		CookPlan:    json.RawMessage(`{"food":{"plan":{"steps":[{"cook_mode":"bake","temperature_cavity":177000}]}}}`),
+	})
+	if c.Mode != "" || c.TargetC != 0 || c.LastCook == nil || c.LastCook.Mode != "bake" {
+		t.Fatalf("idle cook = %+v", c)
+	}
+}

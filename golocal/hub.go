@@ -66,6 +66,7 @@ type StatusSnapshot struct {
 	CookPlan        json.RawMessage `json:"cook_plan"`
 	CookingState    json.RawMessage `json:"cooking_state,omitempty"`
 	DeviceStateAt   time.Time       `json:"-"`
+	CookEndedAt     time.Time       `json:"-"`
 }
 
 type Pairing struct {
@@ -217,8 +218,7 @@ func (h *Hub) detach(p *Peer) {
 	if h.oven == p {
 		h.oven = nil
 		h.lastStatus.ConnectionState = "disconnected"
-		h.lastStatus.CookingState = nil
-		h.lastCookingState = nil
+		h.endCookLocked()
 		// A dropped oven socket can lose the 10018 idle / 10017 end frames.
 		// Fail safe: do not let the camera bridge stay off (or a future
 		// writer think a cook is still active) after the oven goes away.
@@ -323,6 +323,23 @@ func (h *Hub) setCookingState(raw json.RawMessage) {
 	h.mu.Unlock()
 }
 
+// endCook marks the cached cook as finished (10017, 10018 idle, or the oven
+// going away) and drops its live telemetry. The plan is kept for the last-cook
+// view and for /1/messaging/device/.../status.
+func (h *Hub) endCook() {
+	h.mu.Lock()
+	h.endCookLocked()
+	h.mu.Unlock()
+}
+
+func (h *Hub) endCookLocked() {
+	h.lastStatus.CookingState = nil
+	h.lastCookingState = nil
+	if h.lastStatus.CookEndedAt.IsZero() {
+		h.lastStatus.CookEndedAt = time.Now()
+	}
+}
+
 func (h *Hub) applyFixture(connection string, device, plan, cooking json.RawMessage) {
 	h.mu.Lock()
 	if connection != "" {
@@ -354,6 +371,7 @@ func (h *Hub) setDeviceStateRaw(raw []byte) {
 func (h *Hub) setCookPlan(raw json.RawMessage) {
 	h.mu.Lock()
 	h.lastStatus.CookPlan = raw
+	h.lastStatus.CookEndedAt = time.Time{}
 	h.mu.Unlock()
 }
 

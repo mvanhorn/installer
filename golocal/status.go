@@ -106,6 +106,7 @@ type CookStatus struct {
 	ProbeC           float64         `json:"probe_c,omitempty"`
 	UpdatedAt        string          `json:"updated_at,omitempty"`
 	Plan             json.RawMessage `json:"plan,omitempty"`
+	LastCook         *LastCook       `json:"last_cook,omitempty"`
 }
 
 type CameraStatus struct {

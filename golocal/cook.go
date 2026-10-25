@@ -10,16 +10,27 @@ import (
 // CookView is the compact cook snapshot for Home Assistant and the cook page.
 // Field names stay stable so REST sensors can point at /local/cook.
 type CookView struct {
-	Success          bool    `json:"success"`
-	State            string  `json:"state"`
-	Mode             string  `json:"mode,omitempty"`
-	CurrentC         float64 `json:"current_c,omitempty"`
-	TargetC          float64 `json:"target_c,omitempty"`
-	RemainingSeconds int64   `json:"remaining_seconds,omitempty"`
-	DoorOpen         *bool   `json:"door_open,omitempty"`
-	ProbeC           float64 `json:"probe_c,omitempty"`
-	OvenConnected    bool    `json:"oven_connected"`
-	UpdatedAt        string  `json:"updated_at,omitempty"`
+	Success          bool      `json:"success"`
+	State            string    `json:"state"`
+	Mode             string    `json:"mode,omitempty"`
+	CurrentC         float64   `json:"current_c,omitempty"`
+	TargetC          float64   `json:"target_c,omitempty"`
+	RemainingSeconds int64     `json:"remaining_seconds,omitempty"`
+	DoorOpen         *bool     `json:"door_open,omitempty"`
+	ProbeC           float64   `json:"probe_c,omitempty"`
+	OvenConnected    bool      `json:"oven_connected"`
+	UpdatedAt        string    `json:"updated_at,omitempty"`
+	LastCook         *LastCook `json:"last_cook,omitempty"`
+}
+
+// LastCook is the plan of a cook that is no longer running. It is kept apart
+// from the live fields so nothing mistakes it for an active cook.
+type LastCook struct {
+	Mode       string          `json:"mode,omitempty"`
+	TargetC    float64         `json:"target_c,omitempty"`
+	EtaSeconds int64           `json:"eta_seconds,omitempty"`
+	EndedAt    string          `json:"ended_at,omitempty"`
+	Plan       json.RawMessage `json:"plan,omitempty"`
 }
 
 func cookView(hub *Hub) CookView {
@@ -36,6 +47,7 @@ func cookView(hub *Hub) CookView {
 		ProbeC:           c.ProbeC,
 		OvenConnected:    st.ConnectionState == "connected",
 		UpdatedAt:        c.UpdatedAt,
+		LastCook:         c.LastCook,
 	}
 	if v.State == "" {
 		v.State = "idle"
@@ -54,8 +66,23 @@ func parseCook(st StatusSnapshot) CookStatus {
 	applyDeviceCook(&c, mapFromRaw(st.CookingState))
 	applyCookPlan(&c, st.CookPlan)
 
+	ended := !st.CookEndedAt.IsZero()
+	if ended {
+		c.State = "idle"
+	}
 	if c.State == "" {
 		c.State = "idle"
+	}
+	if c.State == "idle" {
+		// The plan stays cached after a cook ends; report it as the last
+		// cook, never as live mode/target/timer.
+		if c.Mode != "" || c.TargetC != 0 || c.EtaSeconds != 0 || len(c.Plan) > 0 {
+			c.LastCook = &LastCook{Mode: c.Mode, TargetC: c.TargetC, EtaSeconds: c.EtaSeconds, Plan: c.Plan}
+			if ended {
+				c.LastCook.EndedAt = st.CookEndedAt.UTC().Format(time.RFC3339)
+			}
+		}
+		c.Mode, c.TargetC, c.EtaSeconds, c.RemainingSeconds, c.Plan = "", 0, 0, 0, nil
 	}
 	return c
 }

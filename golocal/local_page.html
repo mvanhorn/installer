@@ -83,6 +83,7 @@ function cookSub(c) {
     const m = Math.floor(c.remaining_seconds / 60), s = Math.round(c.remaining_seconds % 60);
     bits.push(m + ':' + String(s).padStart(2, '0') + ' left');
   }
+  if (!bits.length && c.state === 'idle' && c.last_cook) bits.push('previous: ' + (c.last_cook.mode || 'cook') + (c.last_cook.target_c ? ' ' + c.last_cook.target_c.toFixed(0) + ' °C' : ''));
   return bits.join(' · ') || 'no active plan';
 }
 function row(k, v, cls) { return `<div class="row"><span>${esc(k)}</span><b class="${cls||''}">${esc(v)}</b></div>`; }
@@ -100,7 +101,7 @@ function render(d) {
     tile('Identity', ident.account_present ? 'Present' : 'Missing',
       ident.token_prefix ? `${ident.token_prefix} · ${ident.token_source}` : (ident.token_source === 'none' ? 'no local token' : ident.token_source),
       ident.account_present ? 'ok' : 'red') +
-    tile('Cooking', d.cook.state === 'idle' ? 'Idle' : (d.cook.mode || 'Cooking'), cookSub(d.cook), d.cook.state === 'idle' ? '' : 'ok') +
+    tile('Cooking', d.cook.state === 'idle' ? 'No cook running' : (d.cook.mode || 'Cooking'), cookSub(d.cook), d.cook.state === 'idle' ? '' : 'ok') +
     tile('Camera', d.camera.camerad_running ? 'Running' : 'Down', `last frame ${secs(d.camera.last_frame_age_seconds)}`, d.camera.last_frame_age_seconds > 20 ? 'amber' : 'ok') +
     tile('Installer', (d.install && d.install.installer_version) || 'unknown', (d.install && d.install.build_id) || '') +
     tile('Server', d.version.version, `${d.version.commit} · ${d.version.build_date}`);
